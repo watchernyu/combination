@@ -1,9 +1,7 @@
 # REDQ source code
-Author's PyTorch implementation of Randomized Ensembled Double Q-Learning (REDQ) algorithm. Paper link: https://arxiv.org/abs/2101.05982
+This particular repo is a copy of the REDQ source code, but modified for other use
 
-This particular repo is a copy of the REDQ source code, but modified for the Fall 22 RL class project. 
-
-NOTE: No need to follow the env setup guide here, your TA will set up the env on your hpc for you. 
+NOTE: this is not the official code repo for REDQ paper. Instead see here: https://github.com/watchernyu/REDQ
 
 <a name="table-of-contents"/> 
 
