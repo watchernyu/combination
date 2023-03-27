@@ -1,3 +1,14 @@
+import os
+# Get the current value of LD_LIBRARY_PATH variable
+ld_library_path = os.environ.get('LD_LIBRARY_PATH', '')
+# Append the new path to the existing value of LD_LIBRARY_PATH
+ld_library_path += ':/workspace/.mujoco/mujoco210/bin:/usr/local/nvidia/lib:/usr/lib/nvidia'
+# Set the modified value of LD_LIBRARY_PATH variable
+os.environ['LD_LIBRARY_PATH'] = ld_library_path
+os.environ['PYTHONPATH'] = '/code'
+os.environ['MUJOCO_GL'] = 'egl'
+os.environ['MUJOCO_PY_MUJOCO_PATH'] = '/workspace/.mujoco/mujoco210/'
+
 from experiments.train_redq_sac import redq_sac as function_to_run ## here make sure you import correct function
 import time
 from redq.utils.run_utils import setup_logger_kwargs
@@ -8,7 +19,7 @@ if __name__ == '__main__':
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--setting', type=int, default=0)
-    parser.add_argument('--debug', action='store_true', default=True)
+    parser.add_argument('--debug', action='store_true', default=False)
     args = parser.parse_args()
     data_dir = '/combdata'
 
