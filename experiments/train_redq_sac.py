@@ -169,9 +169,12 @@ def redq_sac(env_name, seed=0, epochs='mbpo', steps_per_epoch=1000,
 
             """logging"""
             # Log info about epoch
+            time_used = time.time()-start_time
+            time_hrs = int(time_used / 3600 * 100)/100
+            time_total_est_hrs = (total_steps/t) * time_hrs
             logger.log_tabular('Epoch', epoch)
             logger.log_tabular('TotalEnvInteracts', t)
-            logger.log_tabular('Time', time.time()-start_time)
+            logger.log_tabular('Time', time_used)
             logger.log_tabular('EpRet', with_min_and_max=True)
             logger.log_tabular('EpLen', average_only=True)
             logger.log_tabular('TestEpRet', with_min_and_max=True)
@@ -193,6 +196,8 @@ def redq_sac(env_name, seed=0, epochs='mbpo', steps_per_epoch=1000,
                 logger.log_tabular("NormQBias", with_min_and_max=True)
                 logger.log_tabular("QBiasSqr", with_min_and_max=True)
                 logger.log_tabular("NormQBiasSqr", with_min_and_max=True)
+            logger.log_tabular('Hours', time_hrs)
+            logger.log_tabular('TotalHoursEst', time_total_est_hrs)
             logger.dump_tabular()
 
             # flush logged information to disk
