@@ -27,6 +27,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/.mujoco/mujoco210/bin
 export MUJOCO_PY_MUJOCO_PATH=/workspace/.mujoco/mujoco210/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/nvidia/lib
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/.mujoco/mujoco210/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
 export MUJOCO_GL=egl
 cd /code/experiments
 python 0326.py --setting ${SLURM_ARRAY_TASK_ID}
