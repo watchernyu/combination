@@ -1,7 +1,7 @@
-from train_redq_sac import redq_sac as function_to_run ## here make sure you import correct function
+from experiments.train_redq_sac import redq_sac as function_to_run ## here make sure you import correct function
 import time
 from redq.utils.run_utils import setup_logger_kwargs
-from grid_utils import get_setting_and_exp_name
+from experiments.grid_utils import get_setting_and_exp_name
 
 if __name__ == '__main__':
     import argparse
@@ -12,7 +12,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     data_dir = '/combdata'
 
-    exp_prefix = 'exp'
+    exp_prefix = 'e'
     # this wi
     settings = ['env_name','',['Hopper-v3', 'HalfCheetah-v3', 'Walker2d-v3', 'Ant-v3', 'Humanoid-v3'],
                 'seed','',[0, 1, 2],
