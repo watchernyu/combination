@@ -19,10 +19,10 @@ if __name__ == '__main__':
                 'epochs','e',[300],
                 'num_Q','q',[10],
                 'utd_ratio','uf',[20],
-                'ensemble_decay_n_data',[10000, 20000],
+                'ensemble_decay_n_data', 'ed', [10000, 20000],
                 ]
     if args.debug:
-        settings = settings + ['debug',[True],]
+        settings = settings + ['debug','debug',[True],]
 
     indexes, actual_setting, total, exp_name_full = get_setting_and_exp_name(settings, args.setting, exp_prefix)
     print("##### TOTAL NUMBER OF VARIANTS: %d #####" % total)
