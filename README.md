@@ -3,6 +3,8 @@ This particular repo is a copy of the REDQ source code, but modified for other u
 
 NOTE: this is not the official code repo for REDQ paper. Instead see here: https://github.com/watchernyu/REDQ
 
+---
+
 <a name="table-of-contents"/> 
 
 ## Table of Contents  
@@ -415,4 +417,24 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/nvidia/lib
 export MUJOCO_GL=egl
 cd /workspace/REDQ/experiments
 python proj1.py 
+```
+
+---
+
+Run interactive session: 
+srun --pty --gres=gpu:1 --cpus-per-task=1 --mem 12000 -t 0-04:00 bash
+
+
+Run combination alg: 
+
+```
+singularity exec --nv -B /scratch/$USER/sing/combination:/code -B /scratch/$USER/sing/vrl3sing/opt/conda/lib/python3.8/site-packages/mujoco_py/:/opt/conda/lib/python3.8/site-packages/mujoco_py/ -B /scratch/$USER/sing/combdata:/combdata /scratch/$USER/sing/vrl3sing bash
+
+export PYTHONPATH=$PYTHONPATH:/code
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/.mujoco/mujoco210/bin
+export MUJOCO_PY_MUJOCO_PATH=/workspace/.mujoco/mujoco210/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/nvidia/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/.mujoco/mujoco210/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
+export MUJOCO_GL=egl
 ```

@@ -21,12 +21,13 @@ echo "SLURM_ARRAY_TASK_ID: " $SLURM_ARRAY_TASK_ID
 
 echo "Job ID: ${SLURM_ARRAY_TASK_ID}"
 
-singularity exec --nv -B /scratch/$USER/sing/combination:/workspace/REDQ -B /scratch/$USER/sing/mujoco-sandbox/opt/conda/lib/python3.8/site-packages/mujoco_py/:/opt/conda/lib/python3.8/site-packages/mujoco_py/ /scratch/$USER/sing/mujoco-sandbox bash -c "
+singularity exec --nv -B /scratch/$USER/sing/combination:/code -B /scratch/$USER/sing/vrl3sing/opt/conda/lib/python3.8/site-packages/mujoco_py/:/opt/conda/lib/python3.8/site-packages/mujoco_py/ -B /scratch/$USER/sing/combdata:/combdata /scratch/$USER/sing/vrl3sing bash -c "
+export PYTHONPATH=$PYTHONPATH:/code
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/.mujoco/mujoco210/bin
 export MUJOCO_PY_MUJOCO_PATH=/workspace/.mujoco/mujoco210/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/nvidia/lib
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/.mujoco/mujoco210/bin
 export MUJOCO_GL=egl
-cd /workspace/REDQ/experiments/
+cd /code/experiments
 python 0326.py --setting ${SLURM_ARRAY_TASK_ID}
 "

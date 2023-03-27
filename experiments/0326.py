@@ -9,7 +9,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--setting', type=int, default=0)
     args = parser.parse_args()
-    data_dir = '../data'
+    data_dir = '/combdata'
 
     exp_prefix = 'exp'
     # this wi
