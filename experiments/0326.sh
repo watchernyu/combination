@@ -32,3 +32,9 @@ export MUJOCO_GL=egl
 cd /code/experiments
 python 0326.py --setting ${SLURM_ARRAY_TASK_ID}
 "
+
+
+singularity exec --nv -B /scratch/$USER/sing/combination:/code -B /scratch/$USER/sing/vrl3sing/opt/conda/lib/python3.8/site-packages/mujoco_py/:/opt/conda/lib/python3.8/site-packages/mujoco_py/ -B /scratch/$USER/sing/combdata:/combdata /scratch/$USER/sing/vrl3sing bash -c "
+cd /code/experiments
+python 0326.py
+"

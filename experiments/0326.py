@@ -9,6 +9,11 @@ os.environ['PYTHONPATH'] = '/code'
 os.environ['MUJOCO_GL'] = 'egl'
 os.environ['MUJOCO_PY_MUJOCO_PATH'] = '/workspace/.mujoco/mujoco210/'
 
+print(os.environ.get('LD_LIBRARY_PATH', ''))
+print(os.environ.get('PYTHONPATH', ''))
+print(os.environ.get('MUJOCO_GL', ''))
+print(os.environ.get('MUJOCO_PY_MUJOCO_PATH', ''))
+
 from experiments.train_redq_sac import redq_sac as function_to_run ## here make sure you import correct function
 import time
 from redq.utils.run_utils import setup_logger_kwargs
