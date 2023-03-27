@@ -8,6 +8,7 @@ if __name__ == '__main__':
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--setting', type=int, default=0)
+    parser.add_argument('--debug', action='store_true', default=True)
     args = parser.parse_args()
     data_dir = '/combdata'
 
@@ -20,6 +21,8 @@ if __name__ == '__main__':
                 'utd_ratio','uf',[20],
                 'ensemble_decay_n_data',[10000, 20000],
                 ]
+    if args.debug:
+        settings = settings + ['debug',[True],]
 
     indexes, actual_setting, total, exp_name_full = get_setting_and_exp_name(settings, args.setting, exp_prefix)
     print("##### TOTAL NUMBER OF VARIANTS: %d #####" % total)

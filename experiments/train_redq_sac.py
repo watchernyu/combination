@@ -54,6 +54,8 @@ def redq_sac(env_name, seed=0, epochs='mbpo', steps_per_epoch=1000,
     """
     hidden_sizes = [hidden_unit for _ in range(hidden_layer)]
     if debug: # use --debug for very quick debugging
+        for _ in range(3):
+            print("!!!!USING DEBUG SETTINGS!!!!")
         hidden_sizes = [2,2]
         batch_size = 2
         utd_ratio = 2
