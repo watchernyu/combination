@@ -21,7 +21,9 @@ def redq_sac(env_name, seed=0, epochs='mbpo', steps_per_epoch=1000,
              utd_ratio=20, num_Q=10, num_min=2, q_target_mode='min',
              policy_update_delay=20,
              # following are bias evaluation related
-             evaluate_bias=True, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True
+             evaluate_bias=True, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
+             # new experiments
+             ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
              ):
     """
     :param env_name: name of the gym environment
@@ -117,7 +119,7 @@ def redq_sac(env_name, seed=0, epochs='mbpo', steps_per_epoch=1000,
                  alpha, auto_alpha, target_entropy,
                  start_steps, delay_update_steps,
                  utd_ratio, num_Q, num_min, q_target_mode,
-                 policy_update_delay)
+                 policy_update_delay, ensemble_decay_n_data, safe_q_target_factor)
 
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
 

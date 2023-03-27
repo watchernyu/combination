@@ -2,6 +2,7 @@
 data/
 extra-python-libs/
 figures/
+trials/
 
 # ignore experiment files that are not useful to track
 hpc_experiments/
