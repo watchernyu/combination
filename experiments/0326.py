@@ -1,18 +1,9 @@
 import os
-# Get the current value of LD_LIBRARY_PATH variable
 ld_library_path = os.environ.get('LD_LIBRARY_PATH', '')
-# Append the new path to the existing value of LD_LIBRARY_PATH
 ld_library_path += ':/workspace/.mujoco/mujoco210/bin:/usr/local/nvidia/lib:/usr/lib/nvidia'
-# Set the modified value of LD_LIBRARY_PATH variable
 os.environ['LD_LIBRARY_PATH'] = ld_library_path
-os.environ['PYTHONPATH'] = '/code'
 os.environ['MUJOCO_GL'] = 'egl'
 os.environ['MUJOCO_PY_MUJOCO_PATH'] = '/workspace/.mujoco/mujoco210/'
-
-print(os.environ.get('LD_LIBRARY_PATH', ''))
-print(os.environ.get('PYTHONPATH', ''))
-print(os.environ.get('MUJOCO_GL', ''))
-print(os.environ.get('MUJOCO_PY_MUJOCO_PATH', ''))
 
 from experiments.train_redq_sac import redq_sac as function_to_run ## here make sure you import correct function
 import time
