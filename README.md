@@ -1,4 +1,4 @@
-# REDQ source code
+# testing
 This particular repo is a copy of the REDQ source code, but modified for other use
 
 NOTE: this is not the official code repo for REDQ paper. Instead see here: https://github.com/watchernyu/REDQ
