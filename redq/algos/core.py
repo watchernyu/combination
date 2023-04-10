@@ -15,6 +15,15 @@ mbpo_epoches = {'Hopper-v2':125, 'Walker2d-v2':300, 'Ant-v2':300, 'HalfCheetah-v
                 'Hopper-v3':125, 'Walker2d-v3':300, 'Ant-v3':300, 'HalfCheetah-v3':400, 'Humanoid-v3':300,
                 'Hopper-v4':125, 'Walker2d-v4':300, 'Ant-v4':300, 'HalfCheetah-v4':400, 'Humanoid-v4':300}
 
+def get_d4rl_target_entropy(env_name):
+    if 'hopper' in env_name:
+        return -1
+    if 'halfcheetah' in env_name:
+        return -3
+    if 'walker' in env_name:
+        return -3
+    raise ValueError("Unknown env name for target entropy.")
+
 def weights_init_(m):
     # weight init helper function
     if isinstance(m, nn.Linear):

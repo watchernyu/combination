@@ -4,7 +4,7 @@ from torch import Tensor
 import torch.nn as nn
 import torch.optim as optim
 from redq.algos.core import TanhGaussianPolicy, Mlp, soft_update_model1_with_model2, ReplayBuffer,\
-    mbpo_target_entropy_dict
+    get_d4rl_target_entropy
 
 def get_probabilistic_num_min(num_mins):
     # allows the number of min to be a float
@@ -57,7 +57,7 @@ class CQLAgent(object):
             if target_entropy == 'auto':
                 self.target_entropy = - act_dim
             if target_entropy == 'mbpo':
-                self.target_entropy = mbpo_target_entropy_dict[env_name]
+                self.target_entropy = get_d4rl_target_entropy(env_name)
             self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
             self.alpha_optim = optim.Adam([self.log_alpha], lr=lr)
             self.alpha = self.log_alpha.cpu().exp().item()
