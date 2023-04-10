@@ -131,7 +131,7 @@ def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=10
 
     agent.load_data(dataset)
 
-    n_offline_updates = 200
+    n_offline_updates = 1000
     for t in range(n_offline_updates):
         agent.train(logger)
 
