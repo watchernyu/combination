@@ -10,7 +10,7 @@ from redq.utils.run_utils import setup_logger_kwargs
 from redq.utils.bias_utils import log_bias_evaluation
 from redq.utils.logx import EpochLogger
 
-def redq_sac(env_name='hopper-expert-v2', seed=0, epochs='mbpo', steps_per_epoch=1000,
+def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=1000,
              max_ep_len=1000, n_evals_per_epoch=1,
              logger_kwargs=dict(), debug=False,
              # following are agent related hyperparameters
@@ -189,7 +189,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='hopper-expert-v2')
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=-1) # -1 means use mbpo epochs
+    parser.add_argument('--epochs', type=int, default=200) # -1 means use mbpo epochs
     parser.add_argument('--exp_name', type=str, default='redq_sac')
     parser.add_argument('--data_dir', type=str, default='../data/')
     parser.add_argument('--debug', action='store_true')
