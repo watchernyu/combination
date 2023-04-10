@@ -194,7 +194,7 @@ if __name__ == '__main__':
     parser.add_argument('--env', type=str, default='hopper-expert-v2')
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=200) # -1 means use mbpo epochs
-    parser.add_argument('--exp_name', type=str, default='redq_sac')
+    parser.add_argument('--exp_name', type=str, default='cql')
     parser.add_argument('--data_dir', type=str, default='../data/')
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
