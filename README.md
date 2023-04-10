@@ -50,6 +50,7 @@ singularity exec --nv -B /scratch/$USER/sing/combination/:/code -B /scratch/$USE
 ```
 
 ```
+export PYTHONPATH=$PYTHONPATH:/code
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/workspace/.mujoco/mujoco210/bin
 export MUJOCO_PY_MUJOCO_PATH=/workspace/.mujoco/mujoco210/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/nvidia/lib
