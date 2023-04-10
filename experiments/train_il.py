@@ -26,6 +26,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
                evaluate_bias=False, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
                # new experiments
                ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
+               do_pretrain=False,
                ):
     """
     :param env_name: name of the gym environment
@@ -136,37 +137,38 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
 
 
     """========================================== pretrain stage =========================================="""
-    n_pretrain_updates = 200 #TODO fix magic number
+    n_pretrain_updates = 2000 #TODO fix magic number
     pretrain_stage_start_time = time.time()
-    for t in range(n_pretrain_updates):
-        agent.pretrain_update(pretrain_logger)
+    if do_pretrain:
+        for t in range(n_pretrain_updates):
+            agent.pretrain_update(pretrain_logger)
 
-        # End of epoch wrap-up
-        if (t+1) % steps_per_epoch == 0:
-            epoch = t // steps_per_epoch
-            """logging"""
-            # Log info about epoch
-            time_used = time.time()-pretrain_stage_start_time
-            time_hrs = int(time_used / 3600 * 100)/100
-            time_total_est_hrs = (n_pretrain_updates/t) * time_hrs
-            pretrain_logger.log_tabular('Epoch', epoch)
-            pretrain_logger.log_tabular('TotalEnvInteracts', t)
-            pretrain_logger.log_tabular('Time', time_used)
-            pretrain_logger.log_tabular('LossPretrain', with_min_and_max=True)
-            pretrain_logger.log_tabular('Hours', time_hrs)
-            pretrain_logger.log_tabular('TotalHoursEst', time_total_est_hrs)
-            pretrain_logger.dump_tabular()
+            # End of epoch wrap-up
+            if (t+1) % steps_per_epoch == 0:
+                epoch = t // steps_per_epoch
+                """logging"""
+                # Log info about epoch
+                time_used = time.time()-pretrain_stage_start_time
+                time_hrs = int(time_used / 3600 * 100)/100
+                time_total_est_hrs = (n_pretrain_updates/t) * time_hrs
+                pretrain_logger.log_tabular('Epoch', epoch)
+                pretrain_logger.log_tabular('TotalEnvInteracts', t)
+                pretrain_logger.log_tabular('Time', time_used)
+                pretrain_logger.log_tabular('LossPretrain', with_min_and_max=True)
+                pretrain_logger.log_tabular('Hours', time_hrs)
+                pretrain_logger.log_tabular('TotalHoursEst', time_total_est_hrs)
+                pretrain_logger.dump_tabular()
 
-            # flush logged information to disk
-            sys.stdout.flush()
+                # flush logged information to disk
+                sys.stdout.flush()
 
-    time_used = time.time() - pretrain_stage_start_time
-    time_hrs = int(time_used / 3600 * 100) / 100
-    print('Pretraining finished in %.2f hours.' % time_hrs)
-    print('Saved to %s' % pretrain_logger.output_file.name)
+        time_used = time.time() - pretrain_stage_start_time
+        time_hrs = int(time_used / 3600 * 100) / 100
+        print('Pretraining finished in %.2f hours.' % time_hrs)
+        print('Saved to %s' % pretrain_logger.output_file.name)
 
     """========================================== offline stage =========================================="""
-    n_offline_updates = 200 #TODO fix magic number
+    n_offline_updates = 2000 #TODO fix magic number
     # keep track of run time
     offline_stage_start_time = time.time()
     for t in range(n_offline_updates):
