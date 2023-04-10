@@ -5,27 +5,28 @@ import d4rl
 import time
 import sys
 from redq.algos.cql import CQLAgent
+from redq.algos.il import ILAgent
 from redq.algos.core import mbpo_epoches, test_agent
 from redq.utils.run_utils import setup_logger_kwargs
 from redq.utils.bias_utils import log_bias_evaluation
 from redq.utils.logx import EpochLogger
 
-def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=1000,
-             max_ep_len=1000, n_evals_per_epoch=1,
-             logger_kwargs=dict(), debug=False,
-             # following are agent related hyperparameters
-             hidden_layer=2, hidden_unit=256,
-             replay_size=int(1e6), batch_size=256,
-             lr=3e-4, gamma=0.99, polyak=0.995,
-             alpha=0.2, auto_alpha=True, target_entropy='mbpo',
-             start_steps=5000, delay_update_steps='auto',
-             utd_ratio=20, num_Q=10, num_min=2, q_target_mode='min',
-             policy_update_delay=20,
-             # following are bias evaluation related
-             evaluate_bias=False, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
-             # new experiments
-             ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
-             ):
+def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=1000,
+               max_ep_len=1000, n_evals_per_epoch=1,
+               logger_kwargs=dict(), debug=False,
+               # following are agent related hyperparameters
+               hidden_layer=2, hidden_unit=256,
+               replay_size=int(1e6), batch_size=256,
+               lr=3e-4, gamma=0.99, polyak=0.995,
+               alpha=0.2, auto_alpha=True, target_entropy='mbpo',
+               start_steps=5000, delay_update_steps='auto',
+               utd_ratio=20, num_Q=10, num_min=2, q_target_mode='min',
+               policy_update_delay=20,
+               # following are bias evaluation related
+               evaluate_bias=False, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
+               # new experiments
+               ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
+               ):
     """
     :param env_name: name of the gym environment
     :param seed: random seed
@@ -121,7 +122,7 @@ def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=10
     print("Env: %s, number of data loaded: %d." % (env_name, dataset['actions'].shape[0]))
 
     """init agent and load data into buffer"""
-    agent = CQLAgent(env_name, obs_dim, act_dim, act_limit, device,
+    agent = ILAgent(env_name, obs_dim, act_dim, act_limit, device,
                      hidden_sizes, replay_size, batch_size,
                      lr, gamma, polyak,
                      alpha, auto_alpha, target_entropy,
@@ -135,7 +136,7 @@ def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=10
     # keep track of run time
     start_time = time.time()
     for t in range(n_offline_updates):
-        agent.train(logger)
+        agent.update(logger)
 
         # End of epoch wrap-up
         if (t+1) % steps_per_epoch == 0:
@@ -160,12 +161,12 @@ def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=10
             logger.log_tabular('Time', time_used)
             logger.log_tabular('TestEpRet', with_min_and_max=True)
             logger.log_tabular('TestEpLen', average_only=True)
-            logger.log_tabular('Q1Vals', with_min_and_max=True)
-            logger.log_tabular('LossQ1', average_only=True)
+            # logger.log_tabular('Q1Vals', with_min_and_max=True)
+            # logger.log_tabular('LossQ1', average_only=True)
             logger.log_tabular('LogPi', with_min_and_max=True)
             logger.log_tabular('LossPi', average_only=True)
-            logger.log_tabular('Alpha', with_min_and_max=True)
-            logger.log_tabular('LossAlpha', average_only=True)
+            # logger.log_tabular('Alpha', with_min_and_max=True)
+            # logger.log_tabular('LossAlpha', average_only=True)
             logger.log_tabular('PreTanh', with_min_and_max=True)
 
             if evaluate_bias:
@@ -206,5 +207,5 @@ if __name__ == '__main__':
     # for example, for seed 0, the progress.txt will be saved under data_dir/exp_name/exp_name_s0
     logger_kwargs = setup_logger_kwargs(exp_name_full, args.seed, args.data_dir)
 
-    redq_sac(args.env, seed=args.seed, epochs=args.epochs,
-             logger_kwargs=logger_kwargs, debug=args.debug)
+    train_d4rl(args.env, seed=args.seed, epochs=args.epochs,
+               logger_kwargs=logger_kwargs, debug=args.debug)
