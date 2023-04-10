@@ -163,7 +163,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
     time_used = time.time() - pretrain_stage_start_time
     time_hrs = int(time_used / 3600 * 100) / 100
     print('Pretraining finished in %.2f hours.' % time_hrs)
-
+    print('Saved to %s' % pretrain_logger.output_file.name)
 
     """========================================== offline stage =========================================="""
     n_offline_updates = 200 #TODO fix magic number
