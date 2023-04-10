@@ -187,7 +187,7 @@ def redq_sac(env_name='hopper-expert-v2', seed=0, epochs='mbpo', steps_per_epoch
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='Hopper-v3')
+    parser.add_argument('--env', type=str, default='hopper-expert-v2')
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=-1) # -1 means use mbpo epochs
     parser.add_argument('--exp_name', type=str, default='redq_sac')
