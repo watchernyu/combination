@@ -149,13 +149,13 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
             time_used = time.time()-pretrain_stage_start_time
             time_hrs = int(time_used / 3600 * 100)/100
             time_total_est_hrs = (n_pretrain_updates/t) * time_hrs
-            logger.log_tabular('Epoch', epoch)
-            logger.log_tabular('TotalEnvInteracts', t)
-            logger.log_tabular('Time', time_used)
-            logger.log_tabular('LossPretrain', with_min_and_max=True)
-            logger.log_tabular('Hours', time_hrs)
-            logger.log_tabular('TotalHoursEst', time_total_est_hrs)
-            logger.dump_tabular()
+            pretrain_logger.log_tabular('Epoch', epoch)
+            pretrain_logger.log_tabular('TotalEnvInteracts', t)
+            pretrain_logger.log_tabular('Time', time_used)
+            pretrain_logger.log_tabular('LossPretrain', with_min_and_max=True)
+            pretrain_logger.log_tabular('Hours', time_hrs)
+            pretrain_logger.log_tabular('TotalHoursEst', time_total_est_hrs)
+            pretrain_logger.dump_tabular()
 
             # flush logged information to disk
             sys.stdout.flush()
