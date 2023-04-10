@@ -72,13 +72,15 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
     # set number of epoch
     if epochs == 'mbpo' or epochs < 0:
         epochs = mbpo_epoches[env_name]
-    total_steps = steps_per_epoch * epochs + 1
+    n_offline_updates = steps_per_epoch * epochs + 1
 
     """set up logger"""
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
     #     logger_kwargs = dict(output_dir=osp.join(data_dir, relpath),
     #                          exp_name=exp_name)
+    logger_kwargs['output_fname'] = 'pretrain_progress.txt'
+    pretrain_logger = EpochLogger(**logger_kwargs)
 
     """set up environment and seeding"""
     env_fn = lambda: gym.make(env_name)
@@ -132,9 +134,41 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
 
     agent.load_data(dataset)
 
-    n_offline_updates = 200
+
+    """========================================== pretrain stage =========================================="""
+    n_pretrain_updates = 200 #TODO fix magic number
+    pretrain_stage_start_time = time.time()
+    for t in range(n_pretrain_updates):
+        agent.pretrain_update(pretrain_logger)
+
+        # End of epoch wrap-up
+        if (t+1) % steps_per_epoch == 0:
+            epoch = t // steps_per_epoch
+            """logging"""
+            # Log info about epoch
+            time_used = time.time()-pretrain_stage_start_time
+            time_hrs = int(time_used / 3600 * 100)/100
+            time_total_est_hrs = (n_pretrain_updates/t) * time_hrs
+            logger.log_tabular('Epoch', epoch)
+            logger.log_tabular('TotalEnvInteracts', t)
+            logger.log_tabular('Time', time_used)
+            logger.log_tabular('LossPretrain', with_min_and_max=True)
+            logger.log_tabular('Hours', time_hrs)
+            logger.log_tabular('TotalHoursEst', time_total_est_hrs)
+            logger.dump_tabular()
+
+            # flush logged information to disk
+            sys.stdout.flush()
+
+    time_used = time.time() - pretrain_stage_start_time
+    time_hrs = int(time_used / 3600 * 100) / 100
+    print('Pretraining finished in %.2f hours.' % time_hrs)
+
+
+    """========================================== offline stage =========================================="""
+    n_offline_updates = 200 #TODO fix magic number
     # keep track of run time
-    start_time = time.time()
+    offline_stage_start_time = time.time()
     for t in range(n_offline_updates):
         agent.update(logger)
 
@@ -153,9 +187,9 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
 
             """logging"""
             # Log info about epoch
-            time_used = time.time()-start_time
+            time_used = time.time()-offline_stage_start_time
             time_hrs = int(time_used / 3600 * 100)/100
-            time_total_est_hrs = (total_steps/t) * time_hrs
+            time_total_est_hrs = (n_offline_updates/t) * time_hrs
             logger.log_tabular('Epoch', epoch)
             logger.log_tabular('TotalEnvInteracts', t)
             logger.log_tabular('Time', time_used)
@@ -184,7 +218,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
 
             # flush logged information to disk
             sys.stdout.flush()
-    time_used = time.time() - start_time
+    time_used = time.time() - offline_stage_start_time
     time_hrs = int(time_used / 3600 * 100) / 100
     print('Finished in %.2f hours.' % time_hrs)
     print('Saved to %s' % logger.output_file.name)

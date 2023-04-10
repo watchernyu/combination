@@ -247,6 +247,36 @@ class TanhGaussianPolicy(Mlp):
             action * self.action_limit, mean, log_std, log_prob, std, pre_tanh_value,
         )
 
+class TanhGaussianPolicyPretrain(TanhGaussianPolicy):
+    """
+    A Gaussian policy network with Tanh to enforce action limits
+    But can also be pretrained (additional layer to predict next obs)
+    """
+    def __init__(
+            self,
+            obs_dim,
+            action_dim,
+            hidden_sizes,
+            hidden_activation=F.relu,
+            action_limit=1.0
+    ):
+        super().__init__(
+            obs_dim,
+            action_dim,
+            hidden_sizes,
+            hidden_activation,
+            action_limit
+        )
+        self.hidden_to_next_obs = nn.Linear(hidden_sizes[-1], obs_dim)
+        weights_init_(self.hidden_to_next_obs)
+
+    def predict_next_obs(self, obs):
+        h = obs
+        for fc_layer in self.hidden_layers:
+            h = self.hidden_activation(fc_layer(h))
+        obs_next_pred = self.hidden_to_next_obs(h)
+        return obs_next_pred
+
 def soft_update_model1_with_model2(model1, model2, rou):
     """
     used to polyak update a target network

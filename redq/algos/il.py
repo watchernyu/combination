@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from redq.algos.core import TanhGaussianPolicy, Mlp, soft_update_model1_with_model2, ReplayBuffer,\
-    get_d4rl_target_entropy
+    get_d4rl_target_entropy, TanhGaussianPolicyPretrain
 
 class ILAgent(object):
     """
@@ -22,7 +22,7 @@ class ILAgent(object):
                  safe_q_target_factor=0.5,
                  ):
         # set up networks
-        self.policy_net = TanhGaussianPolicy(obs_dim, act_dim, hidden_sizes, action_limit=act_limit).to(device)
+        self.policy_net = TanhGaussianPolicyPretrain(obs_dim, act_dim, hidden_sizes, action_limit=act_limit).to(device)
         # set up optimizers
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
         # set up replay buffer
@@ -124,3 +124,20 @@ class ILAgent(object):
             # by default only log for the last update out of <num_update> updates
             logger.store(LossPi=policy_loss.cpu().item(), LogPi=log_prob_a_tilda.detach().cpu().numpy(),
                          PreTanh=pretanh.abs().detach().cpu().numpy().reshape(-1))
+
+    def pretrain_update(self, logger):
+        # predict next obs with current obs
+        for i_update in range(1):
+            obs_tensor, obs_next_tensor, acts_tensor, rews_tensor, done_tensor = self.sample_data(self.batch_size)
+
+            """mse loss for predicting next obs"""
+            obs_next_pred = self.policy_net.predict_next_obs(obs_tensor)
+            pretrain_loss = F.mse_loss(obs_next_pred, obs_next_tensor)
+            self.policy_optimizer.zero_grad()
+            pretrain_loss.backward()
+
+            """update networks"""
+            self.policy_optimizer.step()
+
+            # by default only log for the last update out of <num_update> updates
+            logger.store(LossPretrain=pretrain_loss.cpu().item())
