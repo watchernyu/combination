@@ -76,6 +76,8 @@ def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=10
     """set up logger"""
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
+    #     logger_kwargs = dict(output_dir=osp.join(data_dir, relpath),
+    #                          exp_name=exp_name)
 
     """set up environment and seeding"""
     env_fn = lambda: gym.make(env_name)
@@ -110,8 +112,6 @@ def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=10
     # Action limit for clamping: critically, assumes all dimensions share the same bound!
     # we need .item() to convert it from numpy float to python float
     act_limit = env.action_space.high[0].item()
-    # keep track of run time
-    start_time = time.time()
     # flush logger (optional)
     sys.stdout.flush()
     #################################################################################################
@@ -132,6 +132,8 @@ def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=10
     agent.load_data(dataset)
 
     n_offline_updates = 200
+    # keep track of run time
+    start_time = time.time()
     for t in range(n_offline_updates):
         agent.train(logger)
 
@@ -181,6 +183,10 @@ def redq_sac(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=10
 
             # flush logged information to disk
             sys.stdout.flush()
+    time_used = time.time() - start_time
+    time_hrs = int(time_used / 3600 * 100) / 100
+    print('Finished in %.2f hours.' % time_hrs)
+    print('Saved to %s' % logger.output_file.name)
 
 if __name__ == '__main__':
     import argparse
