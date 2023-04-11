@@ -4,6 +4,7 @@ import gym
 import d4rl
 import time
 import sys
+import copy
 from redq.algos.cql import CQLAgent
 from redq.algos.il import ILAgent
 from redq.algos.core import mbpo_epoches, test_agent
@@ -11,8 +12,15 @@ from redq.utils.run_utils import setup_logger_kwargs
 from redq.utils.bias_utils import log_bias_evaluation
 from redq.utils.logx import EpochLogger
 
-def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=100, steps_per_epoch=10000,
-               max_ep_len=1000, n_evals_per_epoch=10,
+def copy_agent_without_buffer(agent):
+    buffer_temp = agent.replay_buffer
+    agent.replay_buffer = None
+    agent_copy = copy.deepcopy(agent)
+    agent.replay_buffer = buffer_temp
+    return agent_copy
+
+def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch=1000,
+               max_ep_len=1000, n_evals_per_epoch=1,
                logger_kwargs=dict(), debug=False,
                # following are agent related hyperparameters
                hidden_layer=2, hidden_unit=256,
@@ -167,6 +175,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=100, steps_per_epoch=
         time_hrs = int(time_used / 3600 * 100) / 100
         print('Pretraining finished in %.2f hours.' % time_hrs)
         print('Saved to %s' % pretrain_logger.output_file.name)
+    agent_after_pretrain = copy_agent_without_buffer(agent)
 
     """========================================== offline stage =========================================="""
     n_offline_updates = 2000 #TODO fix magic number
@@ -225,6 +234,9 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=100, steps_per_epoch=
     time_hrs = int(time_used / 3600 * 100) / 100
     print('Offline stage finished in %.2f hours.' % time_hrs)
     print('Saved to %s' % logger.output_file.name)
+
+    """get weight difference and feature difference"""
+    weight_diff, feature_diff = agent.get_weight_and_feature_diff(agent_after_pretrain)
 
 if __name__ == '__main__':
     import argparse
