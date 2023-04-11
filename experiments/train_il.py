@@ -16,7 +16,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
                logger_kwargs=dict(), debug=False,
                # following are agent related hyperparameters
                hidden_layer=2, hidden_unit=256,
-               replay_size=int(1e6), batch_size=256,
+               replay_size=int(2e6), batch_size=256,
                lr=3e-4, gamma=0.99, polyak=0.995,
                alpha=0.2, auto_alpha=True, target_entropy='mbpo',
                start_steps=5000, delay_update_steps='auto',
