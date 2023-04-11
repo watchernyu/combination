@@ -146,7 +146,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
 
 
     """========================================== pretrain stage =========================================="""
-    n_pretrain_updates = 2000 #TODO fix magic number
+    n_pretrain_updates = 200 #TODO fix magic number
     pretrain_stage_start_time = time.time()
     if do_pretrain:
         for t in range(n_pretrain_updates):
@@ -178,7 +178,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     agent_after_pretrain = copy_agent_without_buffer(agent)
 
     """========================================== offline stage =========================================="""
-    n_offline_updates = 2000 #TODO fix magic number
+    n_offline_updates = 200 #TODO fix magic number
     # keep track of run time
     offline_stage_start_time = time.time()
     for t in range(n_offline_updates):
@@ -237,6 +237,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
 
     """get weight difference and feature difference"""
     weight_diff, feature_diff = agent.get_weight_and_feature_diff(agent_after_pretrain)
+    print("Weight diff: %.3f, feature diff: %.3f" %  (weight_diff, feature_diff))
 
 if __name__ == '__main__':
     import argparse

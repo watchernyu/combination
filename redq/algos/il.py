@@ -7,6 +7,13 @@ import torch.nn.functional as F
 from redq.algos.core import TanhGaussianPolicy, Mlp, soft_update_model1_with_model2, ReplayBuffer,\
     get_d4rl_target_entropy, TanhGaussianPolicyPretrain
 
+def concatenate_weights(model, weight_only=True):
+    concatenated_weights = []
+    for name, param in model.named_parameters():
+        if not weight_only or 'weight' in name:
+            concatenated_weights.append(param.view(-1))
+    return torch.cat(concatenated_weights)
+
 class ILAgent(object):
     """
     imitation learning baseline
@@ -141,3 +148,20 @@ class ILAgent(object):
 
             # by default only log for the last update out of <num_update> updates
             logger.store(LossPretrain=pretrain_loss.cpu().item())
+
+    def get_weight_and_feature_diff(self, other_agent):
+        # weight diff: concatenate all weight parameters, get their diff and then compute l2 norm
+        weight_diff = torch.norm(concatenate_weights(self.policy_net) -
+                                 concatenate_weights(other_agent.policy_net), p=2).item()
+
+        # feature diff: for each data point, get difference of feature from old and new network
+        # compute l2 norm of this diff
+        # average over a number of data points.
+        obs_tensor, obs_next_tensor, acts_tensor, rews_tensor, done_tensor = self.sample_data(batch_size=1000)
+
+        old_feature = other_agent.policy_net.get_feature(obs_tensor)
+        new_feature = self.policy_net.get_feature(obs_tensor)
+        feature_diff = old_feature - new_feature # 100 x 256?
+        feature_l2_norm = torch.norm(feature_diff, p=2, dim=1, keepdim=True)
+        average_feature_l2_norm = feature_l2_norm.mean().item()
+        return weight_diff, average_feature_l2_norm

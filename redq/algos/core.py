@@ -206,6 +206,12 @@ class TanhGaussianPolicy(Mlp):
         self.action_limit = action_limit
         self.apply(weights_init_)
 
+    def get_feature(self, obs):
+        h = obs
+        for fc_layer in self.hidden_layers:
+            h = self.hidden_activation(fc_layer(h))
+        return h
+
     def forward(
             self,
             obs,
