@@ -235,9 +235,19 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     print('Offline stage finished in %.2f hours.' % time_hrs)
     print('Saved to %s' % logger.output_file.name)
 
+    """extra info"""
+    final_test_returns = test_agent(agent, test_env, max_ep_len, logger=None, n_eval=10, return_list=True)
+
     """get weight difference and feature difference"""
     weight_diff, feature_diff = agent.get_weight_and_feature_diff(agent_after_pretrain)
     print("Weight diff: %.3f, feature diff: %.3f" %  (weight_diff, feature_diff))
+    extra_dict = {
+        'weight_diff':weight_diff,
+        'feature_diff':feature_diff,
+        'final_test_returns':final_test_returns
+    }
+    logger.save_extra_dict_as_json(extra_dict, 'extra.json')
+    # and then save this somewhere...
 
 if __name__ == '__main__':
     import argparse

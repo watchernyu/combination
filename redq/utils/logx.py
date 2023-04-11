@@ -8,6 +8,7 @@ import joblib
 import numpy as np
 import os.path as osp, time, atexit, os
 from redq.utils.serialization_utils import convert_json
+import json
 
 color2num = dict(
     gray=30,
@@ -172,6 +173,14 @@ class Logger:
             self.output_file.flush()
         self.log_current_row.clear()
         self.first_row=False
+
+    def save_extra_dict_as_json(self, dictionary, file_name):
+        # save a python dictionary to the folder where progress.txt is saved
+        # Save the dictionary to a JSON file
+        full_save_path = osp.join(self.output_dir, file_name)
+        with open(full_save_path, 'w') as file:
+            json.dump(dictionary, file)
+
 
 def get_statistics_scalar(x, with_min_and_max=False):
     """
