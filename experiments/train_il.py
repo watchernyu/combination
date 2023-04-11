@@ -178,7 +178,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     agent_after_pretrain = copy_agent_without_buffer(agent)
 
     """========================================== offline stage =========================================="""
-    n_offline_updates = 200 #TODO fix magic number
+    n_offline_updates = 3000 #TODO fix magic number
     # keep track of run time
     offline_stage_start_time = time.time()
     for t in range(n_offline_updates):
@@ -240,7 +240,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
 
     """get weight difference and feature difference"""
     weight_diff, feature_diff = agent.get_weight_and_feature_diff(agent_after_pretrain)
-    print("Weight diff: %.3f, feature diff: %.3f" %  (weight_diff, feature_diff))
+    print("Weight diff: %.10f, feature diff: %.10f" %  (weight_diff, feature_diff))
     extra_dict = {
         'weight_diff':weight_diff,
         'feature_diff':feature_diff,

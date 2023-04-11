@@ -154,6 +154,8 @@ class ILAgent(object):
         weight_diff = torch.norm(concatenate_weights(self.policy_net) -
                                  concatenate_weights(other_agent.policy_net), p=2).item()
 
+        print(weight_diff)
+
         # feature diff: for each data point, get difference of feature from old and new network
         # compute l2 norm of this diff
         # average over a number of data points.
@@ -162,6 +164,8 @@ class ILAgent(object):
         old_feature = other_agent.policy_net.get_feature(obs_tensor)
         new_feature = self.policy_net.get_feature(obs_tensor)
         feature_diff = old_feature - new_feature # 100 x 256?
+        print(feature_diff)
+
         feature_l2_norm = torch.norm(feature_diff, p=2, dim=1, keepdim=True)
         average_feature_l2_norm = feature_l2_norm.mean().item()
         return weight_diff, average_feature_l2_norm
