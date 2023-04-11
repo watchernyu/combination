@@ -320,3 +320,26 @@ def test_agent(agent, test_env, max_ep_len, logger, n_eval=1, return_list=False)
     if return_list:
         ep_return_list = list(ep_return_list)
     return ep_return_list
+
+def test_agent_d4rl(agent, test_env, max_ep_len, logger, n_eval=1, return_list=False):
+    # save returns and normalized returns
+    ep_return_list = np.zeros(n_eval)
+    ep_normalized_return_list = np.zeros(n_eval)
+    for j in range(n_eval):
+        o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
+        while not (d or (ep_len == max_ep_len)):
+            # Take deterministic actions at test time
+            a = agent.get_test_action(o)
+            o, r, d, _ = test_env.step(a)
+            ep_ret += r
+            ep_len += 1
+        ep_return_list[j] = ep_ret
+        ep_norm_ret = test_env.get_normalized_score(ep_ret)
+        ep_normalized_return_list[j] = ep_norm_ret
+        if logger is not None:
+            logger.store(TestEpRet=ep_ret, TestEpLen=ep_len,
+                         TestEpNormRet=ep_norm_ret)
+    if return_list:
+        ep_return_list = list(ep_return_list)
+        ep_normalized_return_list = list(ep_normalized_return_list)
+    return ep_return_list, ep_normalized_return_list

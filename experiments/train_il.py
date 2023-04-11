@@ -7,7 +7,7 @@ import sys
 import copy
 from redq.algos.cql import CQLAgent
 from redq.algos.il import ILAgent
-from redq.algos.core import mbpo_epoches, test_agent
+from redq.algos.core import mbpo_epoches, test_agent_d4rl
 from redq.utils.run_utils import setup_logger_kwargs
 from redq.utils.bias_utils import log_bias_evaluation
 from redq.utils.logx import EpochLogger
@@ -189,7 +189,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
             epoch = t // steps_per_epoch
 
             # Test the performance of the deterministic version of the agent.
-            test_agent(agent, test_env, max_ep_len, logger, n_eval=n_evals_per_epoch) # add logging here
+            test_agent_d4rl(agent, test_env, max_ep_len, logger, n_eval=n_evals_per_epoch) # add logging here
             if evaluate_bias:
                 log_bias_evaluation(bias_eval_env, agent, logger, max_ep_len, alpha, gamma, n_mc_eval, n_mc_cutoff)
 
@@ -236,7 +236,9 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     print('Saved to %s' % logger.output_file.name)
 
     """extra info"""
-    final_test_returns = test_agent(agent, test_env, max_ep_len, logger=None, n_eval=10, return_list=True)
+    final_test_returns, final_test_normalized_returns = test_agent_d4rl(agent,
+                                                                        test_env, max_ep_len, logger=None,
+                                                                        n_eval=10, return_list=True)
 
     """get weight difference and feature difference"""
     weight_diff, feature_diff = agent.get_weight_and_feature_diff(agent_after_pretrain)
@@ -244,7 +246,8 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     extra_dict = {
         'weight_diff':weight_diff,
         'feature_diff':feature_diff,
-        'final_test_returns':final_test_returns
+        'final_test_returns':final_test_returns,
+        'final_test_normalized_returns': final_test_normalized_returns
     }
     logger.save_extra_dict_as_json(extra_dict, 'extra.json')
     # and then save this somewhere...
