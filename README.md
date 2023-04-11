@@ -61,7 +61,10 @@ export MUJOCO_GL=egl
 cd /code
 ```
 
-
+### zip and send back data
+```
+zip -r ../sendback/il.zip il_*
+```
 
 
 
