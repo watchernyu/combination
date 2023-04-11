@@ -222,7 +222,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
             sys.stdout.flush()
     time_used = time.time() - offline_stage_start_time
     time_hrs = int(time_used / 3600 * 100) / 100
-    print('Finished in %.2f hours.' % time_hrs)
+    print('Offline stage finished in %.2f hours.' % time_hrs)
     print('Saved to %s' % logger.output_file.name)
 
 if __name__ == '__main__':
