@@ -1,7 +1,4 @@
-from train_redq_sac import redq_sac as function_to_run ## here make sure you import correct function
-import time
 import numpy as np
-from redq.utils.run_utils import setup_logger_kwargs
 
 def get_setting_and_exp_name(settings, setting_number, exp_prefix, random_setting_seed=0, random_order=True):
     np.random.seed(random_setting_seed)
