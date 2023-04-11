@@ -11,8 +11,8 @@ from redq.utils.run_utils import setup_logger_kwargs
 from redq.utils.bias_utils import log_bias_evaluation
 from redq.utils.logx import EpochLogger
 
-def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=1000,
-               max_ep_len=1000, n_evals_per_epoch=1,
+def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=100, steps_per_epoch=10000,
+               max_ep_len=1000, n_evals_per_epoch=10,
                logger_kwargs=dict(), debug=False,
                # following are agent related hyperparameters
                hidden_layer=2, hidden_unit=256,
@@ -67,6 +67,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
         start_steps = 100
         steps_per_epoch = 100
         epochs = 5
+        n_evals_per_epoch = 1
 
     # use gpu if available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -179,7 +180,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
             epoch = t // steps_per_epoch
 
             # Test the performance of the deterministic version of the agent.
-            test_agent(agent, test_env, max_ep_len, logger) # add logging here
+            test_agent(agent, test_env, max_ep_len, logger, n_eval=n_evals_per_epoch) # add logging here
             if evaluate_bias:
                 log_bias_evaluation(bias_eval_env, agent, logger, max_ep_len, alpha, gamma, n_mc_eval, n_mc_cutoff)
 
@@ -230,7 +231,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='hopper-expert-v2')
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=200) # -1 means use mbpo epochs
+    parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--exp_name', type=str, default='cql')
     parser.add_argument('--data_dir', type=str, default='../data/')
     parser.add_argument('--debug', action='store_true')
