@@ -17,22 +17,22 @@ mkdir /scratch/$USER/sing
 cd /scratch/$USER/sing 
 ```
 ### start interactive test session: 
-greene interactive session: 
-```
-srun --pty --gres=gpu:1 --cpus-per-task=4 --mem 12000 -t 0-06:00 bash
-```
 greene cpu session: 
 ```
 srun --pty --cpus-per-task=1 --mem 12000 -t 0-06:00 bash
 ```
+greene gpu session: 
+```
+srun --pty --gres=gpu:1 --cpus-per-task=4 --mem 12000 -t 0-06:00 bash
+```
 
-Shanghai interactive gpu session: 
-```
-srun -p aquila,parallel --pty --gres=gpu:1 --mem 12000 -t 0-05:00 bash
-```
 Shanghai interactive cpu session: 
 ```
 srun -p aquila,parallel --pty --mem 12000 -t 0-05:00 bash
+```
+Shanghai interactive gpu session: 
+```
+srun -p aquila,parallel --pty --gres=gpu:1 --mem 12000 -t 0-05:00 bash
 ```
 
 

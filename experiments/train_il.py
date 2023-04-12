@@ -43,13 +43,13 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
                evaluate_bias=False, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
                # new experiments
                ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
-               do_pretrain=False, pretrain_epochs=1000, pretrain_mode=None,
+               do_pretrain=True, pretrain_epochs=1000, pretrain_mode='pi_sprime',
                save_agent=True,
                # pretrain_mode:
-               # 1. pi_predict_next_state
-               # 2. pi_predict_mc
-               # 3. q_predict_next_state
-               # 4. q_predict_mc
+               # 1. pi_sprime
+               # 2. pi_mc
+               # 3. q_sprime
+               # 4. q_mc
                # e.g. we might save the pretrained networks in a folder called pi_predict_next_state_h2_256_e1000
                ):
     """
@@ -172,7 +172,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
             print("Pretrained model loaded from:", pretrain_full_path)
         else:
             for t in range(n_pretrain_updates):
-                agent.pretrain_update(pretrain_logger)
+                agent.pretrain_update(pretrain_logger, pretrain_mode)
 
                 # End of epoch wrap-up
                 if (t+1) % steps_per_epoch == 0:
@@ -260,7 +260,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     print('Offline stage finished in %.2f hours.' % time_hrs)
     print('Log saved to %s' % logger.output_file.name)
     if save_agent:
-        save_dict(logger, {'agent':copy_agent_without_buffer(agent)}, 'agent')
+        save_dict(logger, {'agent':copy_agent_without_buffer(agent)}, 'agent.pt')
 
     """extra info"""
     seed_all(10000)

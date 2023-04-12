@@ -132,22 +132,25 @@ class ILAgent(object):
             logger.store(LossPi=policy_loss.cpu().item(), LogPi=log_prob_a_tilda.detach().cpu().numpy(),
                          PreTanh=pretanh.abs().detach().cpu().numpy().reshape(-1))
 
-    def pretrain_update(self, logger):
+    def pretrain_update(self, logger, pretrain_mode):
         # predict next obs with current obs
         for i_update in range(1):
             obs_tensor, obs_next_tensor, acts_tensor, rews_tensor, done_tensor = self.sample_data(self.batch_size)
 
-            """mse loss for predicting next obs"""
-            obs_next_pred = self.policy_net.predict_next_obs(obs_tensor)
-            pretrain_loss = F.mse_loss(obs_next_pred, obs_next_tensor)
-            self.policy_optimizer.zero_grad()
-            pretrain_loss.backward()
+            if pretrain_mode == 'pi_sprime':
+                """mse loss for predicting next obs"""
+                obs_next_pred = self.policy_net.predict_next_obs(obs_tensor)
+                pretrain_loss = F.mse_loss(obs_next_pred, obs_next_tensor)
+                self.policy_optimizer.zero_grad()
+                pretrain_loss.backward()
 
-            """update networks"""
-            self.policy_optimizer.step()
+                """update networks"""
+                self.policy_optimizer.step()
 
-            # by default only log for the last update out of <num_update> updates
-            logger.store(LossPretrain=pretrain_loss.cpu().item())
+                # by default only log for the last update out of <num_update> updates
+                logger.store(LossPretrain=pretrain_loss.cpu().item())
+            else:
+                raise NotImplementedError("Pretrain mode not implemented: %s" % pretrain_mode)
 
     def get_weight_and_feature_diff(self, other_agent):
         # weight diff: concatenate all weight parameters, get their diff and then compute l2 norm
