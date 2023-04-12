@@ -343,25 +343,3 @@ def test_agent_d4rl(agent, test_env, max_ep_len, logger, n_eval=1, return_list=F
         ep_return_list = list(ep_return_list)
         ep_normalized_return_list = list(ep_normalized_return_list)
     return ep_return_list, ep_normalized_return_list
-
-# def save_snapshot(self, suffix=None):
-#     if suffix is None:
-#         save_name = 'snapshot.pt'
-#     else:
-#         save_name = 'snapshot' + suffix + '.pt'
-#     snapshot = self.work_dir / save_name
-#     keys_to_save = ['agent', 'timer', '_global_step', '_global_episode']
-#     payload = {k: self.__dict__[k] for k in keys_to_save}
-#     payload = {
-#         'agent':
-#     }
-#     with snapshot.open('wb') as f:
-#         torch.save(payload, f)
-#     print("snapshot saved to:", str(snapshot))
-#
-# def load_snapshot(self):
-#     snapshot = self.work_dir / 'snapshot.pt'
-#     with snapshot.open('rb') as f:
-#         payload = torch.load(f)
-#     for k, v in payload.items():
-#         self.__dict__[k] = v
