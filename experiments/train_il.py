@@ -21,6 +21,13 @@ def copy_agent_without_buffer(agent):
     agent.replay_buffer = buffer_temp
     return agent_copy
 
+def save_dict(logger, dictionary, save_name, verbose=1):
+    # save_name can be e.g. sth.pt
+    save_path = os.path.join(logger.output_dir, save_name)
+    torch.save(dictionary, save_path)
+    if verbose > 0:
+        print("Model saved to", save_path)
+
 def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch=1000,
                max_ep_len=1000, n_evals_per_epoch=1,
                logger_kwargs=dict(), debug=False,
@@ -250,7 +257,8 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     time_used = time.time() - offline_stage_start_time
     time_hrs = int(time_used / 3600 * 100) / 100
     print('Offline stage finished in %.2f hours.' % time_hrs)
-    print('Saved to %s' % logger.output_file.name)
+    print('Log saved to %s' % logger.output_file.name)
+    save_dict(logger, {'agent':copy_agent_without_buffer(agent)}, 'agent')
 
     """extra info"""
     seed_all(10000)
