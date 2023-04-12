@@ -34,7 +34,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
                evaluate_bias=False, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
                # new experiments
                ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
-               do_pretrain=False,
+               do_pretrain=False, pretrain_epochs=1000,
                ):
     """
     :param env_name: name of the gym environment
@@ -80,9 +80,8 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     # use gpu if available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # set number of epoch
-    if epochs == 'mbpo' or epochs < 0:
-        epochs = mbpo_epoches[env_name]
     n_offline_updates = steps_per_epoch * epochs + 1
+    n_pretrain_updates = steps_per_epoch * pretrain_epochs + 1
 
     """set up logger"""
     logger = EpochLogger(**logger_kwargs)
@@ -146,7 +145,6 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
 
 
     """========================================== pretrain stage =========================================="""
-    n_pretrain_updates = 200 #TODO fix magic number
     pretrain_stage_start_time = time.time()
     if do_pretrain:
         for t in range(n_pretrain_updates):
@@ -178,7 +176,6 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     agent_after_pretrain = copy_agent_without_buffer(agent)
 
     """========================================== offline stage =========================================="""
-    n_offline_updates = 10000 #TODO fix magic number
     # keep track of run time
     offline_stage_start_time = time.time()
     for t in range(n_offline_updates):
