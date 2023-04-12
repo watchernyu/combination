@@ -91,6 +91,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
         start_steps = 100
         steps_per_epoch = 100
         epochs = 5
+        pretrain_epochs = 5
         n_evals_per_epoch = 1
 
     # use gpu if available
