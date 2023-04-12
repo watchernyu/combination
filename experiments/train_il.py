@@ -44,6 +44,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
                # new experiments
                ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
                do_pretrain=False, pretrain_epochs=1000, pretrain_mode=None,
+               save_agent=True,
                # pretrain_mode:
                # 1. pi_predict_next_state
                # 2. pi_predict_mc
@@ -258,7 +259,8 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     time_hrs = int(time_used / 3600 * 100) / 100
     print('Offline stage finished in %.2f hours.' % time_hrs)
     print('Log saved to %s' % logger.output_file.name)
-    save_dict(logger, {'agent':copy_agent_without_buffer(agent)}, 'agent')
+    if save_agent:
+        save_dict(logger, {'agent':copy_agent_without_buffer(agent)}, 'agent')
 
     """extra info"""
     seed_all(10000)
