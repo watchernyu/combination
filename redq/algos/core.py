@@ -334,7 +334,7 @@ def test_agent_d4rl(agent, test_env, max_ep_len, logger, n_eval=1, return_list=F
             ep_ret += r
             ep_len += 1
         ep_return_list[j] = ep_ret
-        ep_norm_ret = test_env.get_normalized_score(ep_ret)
+        ep_norm_ret = test_env.get_normalized_score(ep_ret) * 100
         ep_normalized_return_list[j] = ep_norm_ret
         if logger is not None:
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len,
