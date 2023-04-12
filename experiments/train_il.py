@@ -1,3 +1,5 @@
+import os.path
+
 import numpy as np
 import torch
 import gym
@@ -34,7 +36,13 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
                evaluate_bias=False, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
                # new experiments
                ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
-               do_pretrain=False, pretrain_epochs=1000,
+               do_pretrain=False, pretrain_epochs=1000, pretrain_mode=None,
+               # pretrain_mode:
+               # 1. pi_predict_next_state
+               # 2. pi_predict_mc
+               # 3. q_predict_next_state
+               # 4. q_predict_mc
+               # e.g. we might save the pretrained networks in a folder called pi_predict_next_state_h2_256_e1000
                ):
     """
     :param env_name: name of the gym environment
@@ -145,34 +153,46 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
 
 
     """========================================== pretrain stage =========================================="""
+    # TODO here add check on whether pretrained model already exist
     pretrain_stage_start_time = time.time()
-    if do_pretrain:
-        for t in range(n_pretrain_updates):
-            agent.pretrain_update(pretrain_logger)
+    if do_pretrain and pretrain_mode is not None:
+        # check if pretrain
+        pretrain_model_file_name = '%s_h%s_%s_e%s.pth' % (pretrain_mode, hidden_layer, hidden_unit, pretrain_epochs)
+        pretrain_full_path = os.path.join('/pretrain', pretrain_model_file_name)
+        if os.path.exists(pretrain_full_path):
+            agent.load_pretrained_model(pretrain_mode, pretrain_full_path)
+            print("Pretrained model loaded from:", pretrain_full_path)
+        else:
+            for t in range(n_pretrain_updates):
+                agent.pretrain_update(pretrain_logger)
 
-            # End of epoch wrap-up
-            if (t+1) % steps_per_epoch == 0:
-                epoch = t // steps_per_epoch
-                """logging"""
-                # Log info about epoch
-                time_used = time.time()-pretrain_stage_start_time
-                time_hrs = int(time_used / 3600 * 100)/100
-                time_total_est_hrs = (n_pretrain_updates/t) * time_hrs
-                pretrain_logger.log_tabular('Epoch', epoch)
-                pretrain_logger.log_tabular('TotalEnvInteracts', t)
-                pretrain_logger.log_tabular('Time', time_used)
-                pretrain_logger.log_tabular('LossPretrain', with_min_and_max=True)
-                pretrain_logger.log_tabular('Hours', time_hrs)
-                pretrain_logger.log_tabular('TotalHoursEst', time_total_est_hrs)
-                pretrain_logger.dump_tabular()
+                # End of epoch wrap-up
+                if (t+1) % steps_per_epoch == 0:
+                    epoch = t // steps_per_epoch
+                    """logging"""
+                    # Log info about epoch
+                    time_used = time.time()-pretrain_stage_start_time
+                    time_hrs = int(time_used / 3600 * 100)/100
+                    time_total_est_hrs = (n_pretrain_updates/t) * time_hrs
+                    pretrain_logger.log_tabular('Epoch', epoch)
+                    pretrain_logger.log_tabular('TotalEnvInteracts', t)
+                    pretrain_logger.log_tabular('Time', time_used)
+                    pretrain_logger.log_tabular('LossPretrain', with_min_and_max=True)
+                    pretrain_logger.log_tabular('Hours', time_hrs)
+                    pretrain_logger.log_tabular('TotalHoursEst', time_total_est_hrs)
+                    pretrain_logger.dump_tabular()
 
-                # flush logged information to disk
-                sys.stdout.flush()
+                    # flush logged information to disk
+                    sys.stdout.flush()
 
-        time_used = time.time() - pretrain_stage_start_time
-        time_hrs = int(time_used / 3600 * 100) / 100
-        print('Pretraining finished in %.2f hours.' % time_hrs)
-        print('Saved to %s' % pretrain_logger.output_file.name)
+            time_used = time.time() - pretrain_stage_start_time
+            time_hrs = int(time_used / 3600 * 100) / 100
+            print('Pretraining finished in %.2f hours.' % time_hrs)
+            print('Log saved to %s' % pretrain_logger.output_file.name)
+            if not os.path.exists(pretrain_full_path): # if no other job saved already
+                agent.save_pretrained_model(pretrain_mode, pretrain_full_path)
+                print("Pretrained model saved to:", pretrain_full_path)
+
     agent_after_pretrain = copy_agent_without_buffer(agent)
 
     """========================================== offline stage =========================================="""

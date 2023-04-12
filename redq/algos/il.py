@@ -168,3 +168,8 @@ class ILAgent(object):
             feature_l2_norm = torch.norm(feature_diff, p=2, dim=1, keepdim=True)
             average_feature_l2_norm_list.append(feature_l2_norm.mean().item())
         return weight_diff, np.mean(average_feature_l2_norm_list)
+
+    def load_pretrained_model(self, pretrain_mode, pretrain_full_path):
+        self.policy_net.load_state_dict(torch.load(pretrain_full_path))
+    def save_pretrained_model(self, pretrain_mode, pretrain_full_path):
+        torch.save(self.policy_net.state_dict(), pretrain_full_path)
