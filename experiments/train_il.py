@@ -44,7 +44,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
                # new experiments
                ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
                do_pretrain=True, pretrain_epochs=1000, pretrain_mode='pi_sprime',
-               save_agent=True,
+               save_agent=True, offline_data_ratio=1,
                # pretrain_mode:
                # 1. pi_sprime
                # 2. pi_mc
@@ -93,6 +93,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
         epochs = 5
         pretrain_epochs = 5
         n_evals_per_epoch = 1
+        offline_data_ratio = 0.4
 
     # use gpu if available
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -158,7 +159,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
                      utd_ratio, num_Q, num_min, q_target_mode,
                      policy_update_delay, ensemble_decay_n_data, safe_q_target_factor)
 
-    agent.load_data(dataset)
+    agent.load_data(dataset, offline_data_ratio)
 
 
     """========================================== pretrain stage =========================================="""

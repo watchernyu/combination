@@ -92,16 +92,21 @@ class ILAgent(object):
         # store one transition to the buffer
         self.replay_buffer.store(o, a, r, o2, d)
 
-    def load_data(self, dataset): # load a d4rl q learning dataset
+    def load_data(self, dataset, data_ratio): # load a d4rl q learning dataset
+        # e.g. if ratio is 0.4, we use 40% of the data (depends on how many we have in the dataset)
         assert self.replay_buffer.size == 0
         n_data = dataset['actions'].shape[0]
         n_data = min(n_data, self.replay_buffer.max_size)
-        self.replay_buffer.obs1_buf[0:n_data] = dataset['observations']
-        self.replay_buffer.obs2_buf[0:n_data] = dataset['next_observations']
-        self.replay_buffer.acts_buf[0:n_data] = dataset['actions']
-        self.replay_buffer.rews_buf[0:n_data] = dataset['rewards']
-        self.replay_buffer.done_buf[0:n_data] = dataset['terminals']
-        self.replay_buffer.ptr, self.replay_buffer.size = n_data, n_data
+
+        n_data_to_use = int(n_data * data_ratio)
+        idxs = np.random.choice(n_data, n_data_to_use, replace=False)
+
+        self.replay_buffer.obs1_buf[0:n_data_to_use] = dataset['observations'][idxs]
+        self.replay_buffer.obs2_buf[0:n_data_to_use] = dataset['next_observations'][idxs]
+        self.replay_buffer.acts_buf[0:n_data_to_use] = dataset['actions'][idxs]
+        self.replay_buffer.rews_buf[0:n_data_to_use] = dataset['rewards'][idxs]
+        self.replay_buffer.done_buf[0:n_data_to_use] = dataset['terminals'][idxs]
+        self.replay_buffer.ptr, self.replay_buffer.size = n_data_to_use, n_data_to_use
 
     def sample_data(self, batch_size, idxs=None):
         # sample data from replay buffer
