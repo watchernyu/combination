@@ -167,7 +167,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     if do_pretrain and pretrain_mode is not None:
         # check if pretrain
         pretrain_model_file_name = '%s_h%s_%s_e%s.pth' % (pretrain_mode, hidden_layer, hidden_unit, pretrain_epochs)
-        pretrain_full_path = os.path.join('/pretrain', pretrain_model_file_name)
+        pretrain_full_path = os.path.join('/code/pretrain', pretrain_model_file_name)
         if os.path.exists(pretrain_full_path):
             agent.load_pretrained_model(pretrain_mode, pretrain_full_path)
             print("Pretrained model loaded from:", pretrain_full_path)
