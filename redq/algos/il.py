@@ -103,9 +103,9 @@ class ILAgent(object):
         self.replay_buffer.done_buf[0:n_data] = dataset['terminals']
         self.replay_buffer.ptr, self.replay_buffer.size = n_data, n_data
 
-    def sample_data(self, batch_size):
+    def sample_data(self, batch_size, idxs=None):
         # sample data from replay buffer
-        batch = self.replay_buffer.sample_batch(batch_size)
+        batch = self.replay_buffer.sample_batch(batch_size, idxs)
         obs_tensor = Tensor(batch['obs1']).to(self.device)
         obs_next_tensor = Tensor(batch['obs2']).to(self.device)
         acts_tensor = Tensor(batch['acts']).to(self.device)
@@ -157,12 +157,14 @@ class ILAgent(object):
         # feature diff: for each data point, get difference of feature from old and new network
         # compute l2 norm of this diff
         # average over a number of data points.
-        obs_tensor, obs_next_tensor, acts_tensor, rews_tensor, done_tensor = self.sample_data(batch_size=1000)
-
-        old_feature = other_agent.policy_net.get_feature(obs_tensor)
-        new_feature = self.policy_net.get_feature(obs_tensor)
-        feature_diff = old_feature - new_feature # 100 x 256?
-
-        feature_l2_norm = torch.norm(feature_diff, p=2, dim=1, keepdim=True)
-        average_feature_l2_norm = feature_l2_norm.mean().item()
-        return weight_diff, average_feature_l2_norm
+        average_feature_l2_norm_list = []
+        idxs_all = np.random.choice(np.arange(0, self.replay_buffer.size), size=100000, replace=False)
+        for i in range(100):
+            idxs = idxs_all[i*1000:(i+1)*1000]
+            obs_tensor, obs_next_tensor, acts_tensor, rews_tensor, done_tensor = self.sample_data(batch_size=1000, idxs=idxs)
+            old_feature = other_agent.policy_net.get_feature(obs_tensor)
+            new_feature = self.policy_net.get_feature(obs_tensor)
+            feature_diff = old_feature - new_feature # 100 x 256?
+            feature_l2_norm = torch.norm(feature_diff, p=2, dim=1, keepdim=True)
+            average_feature_l2_norm_list.append(feature_l2_norm.mean().item())
+        return weight_diff, np.mean(average_feature_l2_norm_list)
