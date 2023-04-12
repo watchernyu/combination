@@ -24,5 +24,5 @@ echo "Job ID: ${SLURM_ARRAY_TASK_ID}"
 singularity exec --nv -B /scratch/$USER/sing/combination/:/code -B /scratch/$USER/sing/d4rl-sandbox/opt/conda/lib/python3.8/site-packages/mujoco_py/:/opt/conda/lib/python3.8/site-packages/mujoco_py/ /scratch/$USER/sing/d4rl-sandbox bash -c "
 cd /code/experiments/pre
 export PYTHONPATH=$PYTHONPATH:/code
-python 0410.py --setting ${SLURM_ARRAY_TASK_ID} --debug
+python 0410.py --setting ${SLURM_ARRAY_TASK_ID}
 "
