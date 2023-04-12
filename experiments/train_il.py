@@ -236,6 +236,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     print('Saved to %s' % logger.output_file.name)
 
     """extra info"""
+    seed_all(10000)
     final_test_returns, final_test_normalized_returns = test_agent_d4rl(agent,
                                                                         test_env, max_ep_len, logger=None,
                                                                         n_eval=10, return_list=True)
