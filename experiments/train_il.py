@@ -28,8 +28,8 @@ def save_dict(logger, dictionary, save_name, verbose=1):
     if verbose > 0:
         print("Model saved to", save_path)
 
-def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch=1000,
-               max_ep_len=1000, n_evals_per_epoch=1,
+def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=5000,
+               max_ep_len=1000, n_evals_per_epoch=10,
                logger_kwargs=dict(), debug=False,
                # following are agent related hyperparameters
                hidden_layer=2, hidden_unit=256,
@@ -43,7 +43,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
                evaluate_bias=False, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
                # new experiments
                ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
-               do_pretrain=True, pretrain_epochs=1000, pretrain_mode='pi_sprime',
+               do_pretrain=True, pretrain_epochs=200, pretrain_mode='pi_sprime',
                save_agent=True, offline_data_ratio=1,
                # pretrain_mode:
                # 1. pi_sprime
@@ -207,6 +207,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     agent_after_pretrain = copy_agent_without_buffer(agent)
 
     """========================================== offline stage =========================================="""
+    best_return, best_return_normalized = 0, 0
     seed_all(100000)
     # keep track of run time
     offline_stage_start_time = time.time()
@@ -218,7 +219,9 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
             epoch = t // steps_per_epoch
 
             # Test the performance of the deterministic version of the agent.
-            test_agent_d4rl(agent, test_env, max_ep_len, logger, n_eval=n_evals_per_epoch) # add logging here
+            rets, rets_normalized = test_agent_d4rl(agent, test_env, max_ep_len, logger, n_eval=n_evals_per_epoch) # add logging here
+            best_return = max(best_return, np.mean(rets))
+            best_return_normalized = max(best_return_normalized, np.mean(rets_normalized))
             if evaluate_bias:
                 log_bias_evaluation(bias_eval_env, agent, logger, max_ep_len, alpha, gamma, n_mc_eval, n_mc_cutoff)
 
@@ -235,7 +238,10 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
             logger.log_tabular('TotalEnvInteracts', t)
             logger.log_tabular('Time', time_used)
             logger.log_tabular('TestEpRet', with_min_and_max=True)
+            logger.log_tabular('TestEpNormRet', with_min_and_max=True)
             logger.log_tabular('TestEpLen', average_only=True)
+            logger.log_tabular('BestRet', best_return)
+            logger.log_tabular('BestNormRet', best_return_normalized)
             # logger.log_tabular('Q1Vals', with_min_and_max=True)
             # logger.log_tabular('LossQ1', average_only=True)
             logger.log_tabular('LogPi', with_min_and_max=True)
@@ -244,15 +250,15 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
             # logger.log_tabular('LossAlpha', average_only=True)
             logger.log_tabular('PreTanh', with_min_and_max=True)
 
-            if evaluate_bias:
-                logger.log_tabular("MCDisRet", with_min_and_max=True)
-                logger.log_tabular("MCDisRetEnt", with_min_and_max=True)
-                logger.log_tabular("QPred", with_min_and_max=True)
-                logger.log_tabular("QBias", with_min_and_max=True)
-                logger.log_tabular("QBiasAbs", with_min_and_max=True)
-                logger.log_tabular("NormQBias", with_min_and_max=True)
-                logger.log_tabular("QBiasSqr", with_min_and_max=True)
-                logger.log_tabular("NormQBiasSqr", with_min_and_max=True)
+            # if evaluate_bias:
+            #     logger.log_tabular("MCDisRet", with_min_and_max=True)
+            #     logger.log_tabular("MCDisRetEnt", with_min_and_max=True)
+            #     logger.log_tabular("QPred", with_min_and_max=True)
+            #     logger.log_tabular("QBias", with_min_and_max=True)
+            #     logger.log_tabular("QBiasAbs", with_min_and_max=True)
+            #     logger.log_tabular("NormQBias", with_min_and_max=True)
+            #     logger.log_tabular("QBiasSqr", with_min_and_max=True)
+            #     logger.log_tabular("NormQBiasSqr", with_min_and_max=True)
             logger.log_tabular('Hours', time_hrs)
             logger.log_tabular('TotalHoursEst', time_total_est_hrs)
             logger.dump_tabular()
@@ -271,6 +277,8 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     final_test_returns, final_test_normalized_returns = test_agent_d4rl(agent,
                                                                         test_env, max_ep_len, logger=None,
                                                                         n_eval=10, return_list=True)
+    best_return = max(best_return, np.mean(final_test_returns))
+    best_return_normalized = max(best_return_normalized, np.mean(final_test_normalized_returns))
 
     """get weight difference and feature difference"""
     weight_diff, feature_diff = agent.get_weight_and_feature_diff(agent_after_pretrain)
@@ -279,7 +287,9 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
         'weight_diff':weight_diff,
         'feature_diff':feature_diff,
         'final_test_returns':final_test_returns,
-        'final_test_normalized_returns': final_test_normalized_returns
+        'final_test_normalized_returns': final_test_normalized_returns,
+        'best_return': best_return,
+        'best_return_normalized':best_return_normalized,
     }
     logger.save_extra_dict_as_json(extra_dict, 'extra.json')
     # and then save this somewhere...
