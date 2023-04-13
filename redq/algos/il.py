@@ -92,13 +92,14 @@ class ILAgent(object):
         # store one transition to the buffer
         self.replay_buffer.store(o, a, r, o2, d)
 
-    def load_data(self, dataset, data_ratio): # load a d4rl q learning dataset
+    def load_data(self, dataset, data_ratio, seed): # load a d4rl q learning dataset
         # e.g. if ratio is 0.4, we use 40% of the data (depends on how many we have in the dataset)
         assert self.replay_buffer.size == 0
         n_data = dataset['actions'].shape[0]
         n_data = min(n_data, self.replay_buffer.max_size)
 
         n_data_to_use = int(n_data * data_ratio)
+        np.random.seed(seed)
         idxs = np.random.choice(n_data, n_data_to_use, replace=False)
 
         self.replay_buffer.obs1_buf[0:n_data_to_use] = dataset['observations'][idxs]

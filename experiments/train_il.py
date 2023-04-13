@@ -159,11 +159,12 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
                      utd_ratio, num_Q, num_min, q_target_mode,
                      policy_update_delay, ensemble_decay_n_data, safe_q_target_factor)
 
-    agent.load_data(dataset, offline_data_ratio)
+    agent.load_data(dataset, offline_data_ratio, seed=999999)
 
 
     """========================================== pretrain stage =========================================="""
     # TODO here add check on whether pretrained model already exist
+    seed_all(epoch=0)
     pretrain_stage_start_time = time.time()
     if do_pretrain and pretrain_mode is not None:
         # check if pretrain
@@ -206,6 +207,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
     agent_after_pretrain = copy_agent_without_buffer(agent)
 
     """========================================== offline stage =========================================="""
+    seed_all(100000)
     # keep track of run time
     offline_stage_start_time = time.time()
     for t in range(n_offline_updates):
@@ -265,7 +267,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=1000, steps_per_epoch
         save_dict(logger, {'agent':copy_agent_without_buffer(agent)}, 'agent.pt')
 
     """extra info"""
-    seed_all(10000)
+    seed_all(200000)
     final_test_returns, final_test_normalized_returns = test_agent_d4rl(agent,
                                                                         test_env, max_ep_len, logger=None,
                                                                         n_eval=10, return_list=True)
