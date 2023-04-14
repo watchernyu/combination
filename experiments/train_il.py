@@ -86,8 +86,6 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
             print("!!!!USING DEBUG SETTINGS!!!!")
         hidden_sizes = [3,3]
         batch_size = 4
-        utd_ratio = 2
-        num_Q = 3
         max_ep_len = 100
         start_steps = 100
         steps_per_epoch = 100
