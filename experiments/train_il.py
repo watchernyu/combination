@@ -45,6 +45,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
                ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
                do_pretrain=False, pretrain_epochs=200, pretrain_mode='pi_sprime',
                save_agent=True, offline_data_ratio=1, agent_type='il',
+               cql_weight=1, cql_n_random=10, cql_temp=1, std=0.1,
                # pretrain_mode:
                # 1. pi_sprime
                # 2. pi_mc
@@ -166,7 +167,9 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
                          alpha, auto_alpha, target_entropy,
                          start_steps, delay_update_steps,
                          utd_ratio, num_Q, num_min, q_target_mode,
-                         policy_update_delay, ensemble_decay_n_data, safe_q_target_factor)
+                         policy_update_delay, ensemble_decay_n_data, safe_q_target_factor,
+                         cql_weight, cql_n_random, cql_temp, std,
+                         )
 
     agent.load_data(dataset, offline_data_ratio, seed=999999)
 
@@ -316,6 +319,8 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='../data/')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--pretrain', action='store_true')
+    parser.add_argument('--agent', type=str, default='cql')
+
     args = parser.parse_args()
 
     # modify the code here if you want to use a different naming scheme
@@ -326,4 +331,5 @@ if __name__ == '__main__':
     logger_kwargs = setup_logger_kwargs(exp_name_full, args.seed, args.data_dir)
 
     train_d4rl(args.env, seed=args.seed, epochs=args.epochs,
-               logger_kwargs=logger_kwargs, debug=args.debug, do_pretrain=args.pretrain)
+               logger_kwargs=logger_kwargs, debug=args.debug, do_pretrain=args.pretrain,
+               agent_type=args.agent)
