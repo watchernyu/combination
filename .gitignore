@@ -4,6 +4,9 @@ extra-python-libs/
 figures/
 trials/
 sendback/
+# ignore hpc log files
+*.out
+*.err
 
 # ignore experiment files that are not useful to track
 hpc_experiments/
