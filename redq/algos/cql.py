@@ -182,7 +182,7 @@ class CQLAgent(object):
         q2 = self.q_target_net_list[1](torch.cat([obs, act], 1))
         return q1, q2
     def get_act(self, obs):
-        a_tilda, mean_a_tilda, log_std_a_tilda, log_prob_a_tilda, _, pretanh = self.policy_net.forward(obs)
+        a_tilda, mean_a_tilda, log_std_a_tilda, log_prob_a_tilda, _, pretanh = self.policy_net.forward(obs, std=self.std)
         return a_tilda
 
     def update(self, logger):
@@ -289,9 +289,6 @@ class CQLAgent(object):
                 logger.store(LossPretrain=pretrain_loss.cpu().item())
             else:
                 raise NotImplementedError("Pretrain mode not implemented: %s" % pretrain_mode)
-
-    def get_weight_and_feature_diff(self, other_agent):  #TODO change from IL
-        return weight_diff, np.mean(average_feature_l2_norm_list)
 
     def load_pretrained_model(self, pretrain_mode, pretrain_full_path):  #TODO change from IL
         self.policy_net.load_state_dict(torch.load(pretrain_full_path))
