@@ -4,15 +4,8 @@ from torch import Tensor
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from redq.algos.core import TanhGaussianPolicy, Mlp, soft_update_model1_with_model2, ReplayBuffer,\
-    get_d4rl_target_entropy, TanhGaussianPolicyPretrain
-
-def concatenate_weights(model, weight_only=True):
-    concatenated_weights = []
-    for name, param in model.named_parameters():
-        if not weight_only or 'weight' in name:
-            concatenated_weights.append(param.view(-1))
-    return torch.cat(concatenated_weights)
+from redq.algos.core import soft_update_model1_with_model2, ReplayBuffer,\
+    get_d4rl_target_entropy, PolicyNetworkPretrain, concatenate_weights_of_model_list
 
 class ILAgent(object):
     """
@@ -23,13 +16,13 @@ class ILAgent(object):
                  lr=3e-4, gamma=0.99, polyak=0.995,
                  alpha=0.2, auto_alpha=True, target_entropy='mbpo',
                  start_steps=5000, delay_update_steps='auto',
-                 utd_ratio=20, num_Q=10, num_min=2, q_target_mode='min',
+                 utd_ratio=1, num_Q=2, num_min=2, q_target_mode='min',
                  policy_update_delay=20,
                  ensemble_decay_n_data=20000, # wait for how many data to reduce number of ensemble (e.g. 20,000 data)
                  safe_q_target_factor=0.5,
                  ):
         # set up networks
-        self.policy_net = TanhGaussianPolicyPretrain(obs_dim, act_dim, hidden_sizes, action_limit=act_limit).to(device)
+        self.policy_net = PolicyNetworkPretrain(obs_dim, act_dim, hidden_sizes, action_limit=act_limit).to(device)
         # set up optimizers
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
         # set up replay buffer
@@ -67,23 +60,11 @@ class ILAgent(object):
         # used to determine whether we should get action from policy or take random starting actions
         return self.replay_buffer.size
 
-    def get_exploration_action(self, obs, env):
-        # given an observation, output a sampled action in numpy form
-        with torch.no_grad():
-            if self.__get_current_num_data() > self.start_steps:
-                obs_tensor = torch.Tensor(obs).unsqueeze(0).to(self.device)
-                action_tensor = self.policy_net.forward(obs_tensor, deterministic=False,
-                                             return_log_prob=False)[0]
-                action = action_tensor.cpu().numpy().reshape(-1)
-            else:
-                action = env.action_space.sample()
-        return action
-
     def get_test_action(self, obs):
         # given an observation, output a deterministic action in numpy form
         with torch.no_grad():
             obs_tensor = torch.Tensor(obs).unsqueeze(0).to(self.device)
-            action_tensor = self.policy_net.forward(obs_tensor, deterministic=True,
+            action_tensor = self.policy_net.forward(obs_tensor, std=0, deterministic=True,
                                          return_log_prob=False)[0]
             action = action_tensor.cpu().numpy().reshape(-1)
         return action
@@ -126,7 +107,7 @@ class ILAgent(object):
 
             """BC loss"""
             # get policy loss
-            a_tilda, mean_a_tilda, log_std_a_tilda, log_prob_a_tilda, _, pretanh = self.policy_net.forward(obs_tensor)
+            a_tilda, mean_a_tilda, _, log_prob_a_tilda, _, pretanh = self.policy_net.forward(obs_tensor, std=0)
             policy_loss = F.mse_loss(mean_a_tilda, acts_tensor)
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
@@ -135,7 +116,7 @@ class ILAgent(object):
             self.policy_optimizer.step()
 
             # by default only log for the last update out of <num_update> updates
-            logger.store(LossPi=policy_loss.cpu().item(), LogPi=log_prob_a_tilda.detach().cpu().numpy(),
+            logger.store(LossPi=policy_loss.item(), LogPi=log_prob_a_tilda.mean().item(),
                          PreTanh=pretanh.abs().detach().cpu().numpy().reshape(-1))
 
     def pretrain_update(self, logger, pretrain_mode):
@@ -158,26 +139,15 @@ class ILAgent(object):
             else:
                 raise NotImplementedError("Pretrain mode not implemented: %s" % pretrain_mode)
 
-    def get_weight_and_feature_diff(self, other_agent):
-        # weight diff: concatenate all weight parameters, get their diff and then compute l2 norm
-        weight_diff = torch.norm(concatenate_weights(self.policy_net) -
-                                 concatenate_weights(other_agent.policy_net), p=2).item()
-
-        # feature diff: for each data point, get difference of feature from old and new network
-        # compute l2 norm of this diff
-        # average over a number of data points.
-        average_feature_l2_norm_list = []
-        idxs_all = np.random.choice(np.arange(0, self.replay_buffer.size), size=100000, replace=False)
-        for i in range(100):
-            idxs = idxs_all[i*1000:(i+1)*1000]
-            obs_tensor, obs_next_tensor, acts_tensor, rews_tensor, done_tensor = self.sample_data(batch_size=1000, idxs=idxs)
-            old_feature = other_agent.policy_net.get_feature(obs_tensor)
-            new_feature = self.policy_net.get_feature(obs_tensor)
-            feature_diff = old_feature - new_feature # 100 x 256?
-            feature_l2_norm = torch.norm(feature_diff, p=2, dim=1, keepdim=True)
-            average_feature_l2_norm_list.append(feature_l2_norm.mean().item())
-        return weight_diff, np.mean(average_feature_l2_norm_list)
-
+    def layers_for_weight_diff(self):
+        return self.policy_net.hidden_layers
+    def features_from_batch(self, batch):
+        obs_tensor = Tensor(batch['obs1']).to(self.device)
+        obs_next_tensor = Tensor(batch['obs2']).to(self.device)
+        acts_tensor = Tensor(batch['acts']).to(self.device)
+        rews_tensor = Tensor(batch['rews']).unsqueeze(1).to(self.device)
+        done_tensor = Tensor(batch['done']).unsqueeze(1).to(self.device)
+        return self.policy_net.get_feature(obs_tensor)
     def load_pretrained_model(self, pretrain_mode, pretrain_full_path):
         self.policy_net.load_state_dict(torch.load(pretrain_full_path))
     def save_pretrained_model(self, pretrain_mode, pretrain_full_path):

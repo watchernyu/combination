@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from torch import Tensor
 from torch.distributions import Distribution, Normal
 # following SAC authors' and OpenAI implementation
 LOG_SIG_MAX = 2
@@ -283,6 +284,95 @@ class TanhGaussianPolicyPretrain(TanhGaussianPolicy):
         obs_next_pred = self.hidden_to_next_obs(h)
         return obs_next_pred
 
+class PolicyNetworkPretrain(nn.Module):
+    """
+    A Gaussian policy network with Tanh to enforce action limits
+    with state independent std
+    and can be pretrained
+    """
+    def __init__(
+            self,
+            obs_dim,
+            action_dim,
+            hidden_sizes,
+            hidden_activation=F.relu,
+            action_limit=1.0,
+    ):
+        super().__init__()
+        self.input_size = obs_dim
+        self.output_size = action_dim
+        self.hidden_activation = hidden_activation
+        self.action_limit = action_limit
+        self.hidden_layers = nn.ModuleList()
+        in_size = self.input_size
+
+        ## initialize each hidden layer
+        for i, next_size in enumerate(hidden_sizes):
+            fc_layer = nn.Linear(in_size, next_size)
+            in_size = next_size
+            self.hidden_layers.append(fc_layer)
+
+        # hidden to action
+        self.last_fc_layer = nn.Linear(in_size, self.output_size)
+
+        # pretrain mode: pi_sprime
+        self.hidden_to_next_obs = nn.Linear(hidden_sizes[-1], obs_dim)
+        # pretrain mode: pi_mc
+        self.hidden_to_value = nn.Linear(hidden_sizes[-1], 1)
+
+        # init networks
+        self.apply(weights_init_)
+
+    def get_feature(self, obs):
+        h = obs
+        for fc_layer in self.hidden_layers:
+            h = self.hidden_activation(fc_layer(h))
+        return h
+
+    def predict_next_obs(self, obs):
+        h = self.get_feature(obs)
+        return self.hidden_to_next_obs(h)
+
+    def predict_value(self, obs):
+        h = self.get_feature(obs)
+        return self.hidden_to_value(h)
+
+    def forward(
+            self,
+            obs,
+            std,
+            deterministic=False,
+            return_log_prob=True,
+    ):
+        """
+        :param obs: Observation
+        :param reparameterize: if True, use the reparameterization trick
+        :param deterministic: If True, take determinisitc (test) action
+        :param return_log_prob: If True, return a sample and its log probability
+        """
+        h = self.get_feature(obs)
+        mean = self.last_fc_layer(h)
+        normal = Normal(mean, std)
+
+        if deterministic:
+            pre_tanh_value = mean
+            action = torch.tanh(mean)
+        else:
+            pre_tanh_value = normal.rsample()
+            action = torch.tanh(pre_tanh_value)
+
+        if return_log_prob:
+            log_prob = normal.log_prob(pre_tanh_value)
+            log_prob -= torch.log(1 - action.pow(2) + ACTION_BOUND_EPSILON)
+            log_prob = log_prob.sum(1, keepdim=True)
+        else:
+            log_prob = None
+
+        return (
+            action * self.action_limit, mean, None, log_prob, std, pre_tanh_value,
+        )
+
+
 def soft_update_model1_with_model2(model1, model2, rou):
     """
     used to polyak update a target network
@@ -343,3 +433,46 @@ def test_agent_d4rl(agent, test_env, max_ep_len, logger, n_eval=1, return_list=F
         ep_return_list = list(ep_return_list)
         ep_normalized_return_list = list(ep_normalized_return_list)
     return ep_return_list, ep_normalized_return_list
+
+def concatenate_weights(model, weight_only=True):
+    concatenated_weights = []
+    for name, param in model.named_parameters():
+        if not weight_only or 'weight' in name:
+            concatenated_weights.append(param.view(-1))
+    return torch.cat(concatenated_weights)
+
+def concatenate_weights_of_model_list(model_list, weight_only=True):
+    concatenated_weights = []
+    for model in model_list:
+        for name, param in model.named_parameters():
+            if not weight_only or 'weight' in name:
+                concatenated_weights.append(param.view(-1))
+    return torch.cat(concatenated_weights)
+
+# when compute weight diff, just provide list of important layers...from
+def get_weight_diff(agent1, agent2):
+    # weight diff, agent class should have layers_for_weight_diff() func
+    weights1 = concatenate_weights_of_model_list(agent1.layers_for_weight_diff())
+    weights2 = concatenate_weights_of_model_list(agent2.layers_for_weight_diff())
+    weight_diff = torch.norm(weights1-weights2, p=2).item()
+    return weight_diff
+
+def get_feature_diff(agent1, agent2, replay_buffer):
+    # feature diff: for each data point, get difference of feature from old and new network
+    # compute l2 norm of this diff, average over a number of data points.
+    # agent class should have features_from_batch() func
+    average_feature_l2_norm_list = []
+    idxs_all = np.random.choice(np.arange(0, replay_buffer.size), size=100000, replace=False)
+    batch_size = 1000
+    for i in range(100):
+        idxs = idxs_all[i*1000:(i+1)*1000]
+
+        batch = replay_buffer.sample_batch(batch_size, idxs)
+        old_feature = agent1.features_from_batch(batch)
+        new_feature = agent2.features_from_batch(batch)
+        feature_diff = old_feature - new_feature
+
+        feature_l2_norm = torch.norm(feature_diff, p=2, dim=1, keepdim=True)
+        average_feature_l2_norm_list.append(feature_l2_norm.mean().item())
+    return np.mean(average_feature_l2_norm_list)
+

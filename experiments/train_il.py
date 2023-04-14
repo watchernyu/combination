@@ -9,7 +9,7 @@ import sys
 import copy
 from redq.algos.cql import CQLAgent
 from redq.algos.il import ILAgent
-from redq.algos.core import mbpo_epoches, test_agent_d4rl
+from redq.algos.core import mbpo_epoches, test_agent_d4rl, get_weight_diff, get_feature_diff
 from redq.utils.run_utils import setup_logger_kwargs
 from redq.utils.bias_utils import log_bias_evaluation
 from redq.utils.logx import EpochLogger
@@ -37,7 +37,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
                lr=3e-4, gamma=0.99, polyak=0.995,
                alpha=0.2, auto_alpha=True, target_entropy='mbpo',
                start_steps=5000, delay_update_steps='auto',
-               utd_ratio=20, num_Q=10, num_min=2, q_target_mode='min',
+               utd_ratio=1, num_Q=2, num_min=2, q_target_mode='min',
                policy_update_delay=20,
                # following are bias evaluation related
                evaluate_bias=False, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
@@ -281,8 +281,9 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
     best_return_normalized = max(best_return_normalized, np.mean(final_test_normalized_returns))
 
     """get weight difference and feature difference"""
-    weight_diff, feature_diff = agent.get_weight_and_feature_diff(agent_after_pretrain)
-    print("Weight diff: %.10f, feature diff: %.10f" %  (weight_diff, feature_diff))
+    weight_diff = get_weight_diff(agent, agent_after_pretrain)
+    feature_diff = get_feature_diff(agent, agent_after_pretrain, agent.replay_buffer)
+    print("Weight diff: %.4f, feature diff: %.4f" %  (weight_diff, feature_diff))
     extra_dict = {
         'weight_diff':weight_diff,
         'feature_diff':feature_diff,
