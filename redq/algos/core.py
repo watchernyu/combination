@@ -353,6 +353,7 @@ class PolicyNetworkPretrain(nn.Module):
         h = self.get_feature(obs)
         mean = self.last_fc_layer(h)
 
+        std = max(std, 1e-9)
         normal = Normal(mean, torch.ones_like(mean)*std)
 
         if deterministic:
