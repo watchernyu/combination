@@ -254,36 +254,6 @@ class TanhGaussianPolicy(Mlp):
             action * self.action_limit, mean, log_std, log_prob, std, pre_tanh_value,
         )
 
-class TanhGaussianPolicyPretrain(TanhGaussianPolicy):
-    """
-    A Gaussian policy network with Tanh to enforce action limits
-    But can also be pretrained (additional layer to predict next obs)
-    """
-    def __init__(
-            self,
-            obs_dim,
-            action_dim,
-            hidden_sizes,
-            hidden_activation=F.relu,
-            action_limit=1.0
-    ):
-        super().__init__(
-            obs_dim,
-            action_dim,
-            hidden_sizes,
-            hidden_activation,
-            action_limit
-        )
-        self.hidden_to_next_obs = nn.Linear(hidden_sizes[-1], obs_dim)
-        weights_init_(self.hidden_to_next_obs)
-
-    def predict_next_obs(self, obs):
-        h = obs
-        for fc_layer in self.hidden_layers:
-            h = self.hidden_activation(fc_layer(h))
-        obs_next_pred = self.hidden_to_next_obs(h)
-        return obs_next_pred
-
 class PolicyNetworkPretrain(nn.Module):
     """
     A Gaussian policy network with Tanh to enforce action limits
@@ -373,6 +343,59 @@ class PolicyNetworkPretrain(nn.Module):
         return (
             action * self.action_limit, mean, None, log_prob, std, pre_tanh_value,
         )
+
+class QNetworkPretrain(nn.Module):
+    def __init__(
+            self,
+            input_size,
+            output_size,
+            hidden_sizes,
+            hidden_activation=F.relu
+    ):
+        super().__init__()
+
+        self.input_size = input_size
+        self.output_size = output_size
+        self.hidden_activation = hidden_activation
+        ## here we use ModuleList so that the layers in it can be
+        ## detected by .parameters() call
+        self.hidden_layers = nn.ModuleList()
+        in_size = input_size
+
+        ## initialize each hidden layer
+        for i, next_size in enumerate(hidden_sizes):
+            fc_layer = nn.Linear(in_size, next_size)
+            in_size = next_size
+            self.hidden_layers.append(fc_layer)
+
+        ## init last fully connected layer with small weight and bias
+        self.last_fc_layer = nn.Linear(in_size, output_size)
+
+        # pretrain mode: q_sprime
+        self.hidden_to_next_obs = nn.Linear(hidden_sizes[-1], input_size)
+        # pretrain mode: q_mc
+        self.hidden_to_value = nn.Linear(hidden_sizes[-1], 1)
+
+        self.apply(weights_init_)
+
+    def get_feature(self, input):
+        h = input
+        for fc_layer in self.hidden_layers:
+            h = self.hidden_activation(fc_layer(h))
+        return h
+
+    def predict_next_obs(self, input):
+        h = self.get_feature(input)
+        return self.hidden_to_next_obs(h)
+
+    def predict_value(self, input):
+        h = self.get_feature(input)
+        return self.hidden_to_value(h)
+
+    def forward(self, input):
+        h = self.get_feature(input)
+        output = self.last_fc_layer(h)
+        return output
 
 
 def soft_update_model1_with_model2(model1, model2, rou):

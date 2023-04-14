@@ -80,11 +80,11 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
     :param q_target_mode: 'min' for minimal, 'ave' for average, 'rem' for random ensemble mixture
     :param policy_update_delay: how many updates until we update policy network
     """
-    hidden_sizes = [hidden_unit for _ in range(hidden_layer)]
     if debug: # use --debug for very quick debugging
         for _ in range(3):
             print("!!!!USING DEBUG SETTINGS!!!!")
-        hidden_sizes = [3,3]
+        hidden_layer = 2
+        hidden_unit = 3
         batch_size = 4
         max_ep_len = 100
         start_steps = 100
@@ -152,7 +152,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
     """init agent and load data into buffer"""
     if agent_type == 'il':
         agent = ILAgent(env_name, obs_dim, act_dim, act_limit, device,
-                         hidden_sizes, replay_size, batch_size,
+                         hidden_layer, hidden_unit, replay_size, batch_size,
                          lr, gamma, polyak,
                          alpha, auto_alpha, target_entropy,
                          start_steps, delay_update_steps,
@@ -160,7 +160,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
                          policy_update_delay, ensemble_decay_n_data, safe_q_target_factor)
     if agent_type == 'cql':
         agent = CQLAgent(env_name, obs_dim, act_dim, act_limit, device,
-                         hidden_sizes, replay_size, batch_size,
+                         hidden_layer, hidden_unit, replay_size, batch_size,
                          lr, gamma, polyak,
                          alpha, auto_alpha, target_entropy,
                          start_steps, delay_update_steps,
@@ -179,13 +179,15 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
     if do_pretrain and pretrain_mode is not None:
         print("Pretraining start, mode:",pretrain_mode)
         # check if pretrain
-        pretrain_model_file_name = '%s_h%s_%s_e%s.pth' % (pretrain_mode, hidden_layer, hidden_unit, pretrain_epochs)
-        pretrain_full_path = os.path.join('/code/pretrain', pretrain_model_file_name)
-        if os.path.exists(pretrain_full_path):
-            print("Try loading pretrained model:",pretrain_full_path)
-            agent.load_pretrained_model(pretrain_mode, pretrain_full_path)
-            print("Pretrained model loaded from:", pretrain_full_path)
-        else:
+        pretrain_model_folder_path = '/code/pretrain'
+        try:
+            agent.load_pretrained_model(pretrain_model_folder_path, pretrain_mode, pretrain_epochs)
+            pretrain_loaded = True
+        except Exception as e:
+            pretrain_loaded = False
+            print("Load pretrained model failed. Start pretraining.")
+
+        if not pretrain_loaded:
             for t in range(n_pretrain_updates):
                 agent.pretrain_update(pretrain_logger, pretrain_mode)
 
@@ -212,9 +214,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
             time_hrs = int(time_used / 3600 * 100) / 100
             print('Pretraining finished in %.2f hours.' % time_hrs)
             print('Log saved to %s' % pretrain_logger.output_file.name)
-            if not os.path.exists(pretrain_full_path): # if no other job saved already
-                agent.save_pretrained_model(pretrain_mode, pretrain_full_path)
-                print("Pretrained model saved to:", pretrain_full_path)
+            agent.save_pretrained_model(pretrain_model_folder_path, pretrain_mode, pretrain_epochs)
 
     agent_after_pretrain = copy_agent_without_buffer(agent)
 

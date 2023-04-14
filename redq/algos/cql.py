@@ -1,3 +1,4 @@
+import os.path
 import numpy as np
 import torch
 from torch import Tensor
@@ -28,7 +29,7 @@ class CQLAgent(object):
     REM: set q_target_mode to 'rem'
     """
     def __init__(self, env_name, obs_dim, act_dim, act_limit, device,
-                 hidden_sizes=(256, 256), replay_size=int(1e6), batch_size=256,
+                 hidden_layer=2, hidden_unit=256, replay_size=int(1e6), batch_size=256,
                  lr=3e-4, gamma=0.99, polyak=0.995,
                  alpha=0.2, auto_alpha=True, target_entropy='mbpo',
                  start_steps=5000, delay_update_steps='auto',
@@ -39,6 +40,7 @@ class CQLAgent(object):
                  cql_weight=1, cql_n_random=10, cql_temp=1, std=0.1,
                  ):
         # set up networks
+        hidden_sizes = [hidden_unit for _ in range(hidden_layer)]
         self.policy_net = PolicyNetworkPretrain(obs_dim, act_dim, hidden_sizes, action_limit=act_limit).to(device)
         self.q_net_list, self.q_target_net_list = [], []
         for q_i in range(num_Q):
@@ -67,6 +69,8 @@ class CQLAgent(object):
         self.act_dim = act_dim
         self.act_limit = act_limit
         self.lr = lr
+        self.hidden_layer = hidden_layer
+        self.hidden_unit = hidden_unit
         self.hidden_sizes = hidden_sizes
         self.gamma = gamma
         self.polyak = polyak
@@ -278,7 +282,40 @@ class CQLAgent(object):
             else:
                 raise NotImplementedError("Pretrain mode not implemented: %s" % pretrain_mode)
 
-    def load_pretrained_model(self, pretrain_mode, pretrain_full_path):  #TODO change from IL
-        self.policy_net.load_state_dict(torch.load(pretrain_full_path))
-    def save_pretrained_model(self, pretrain_mode, pretrain_full_path):  #TODO change from IL
-        torch.save(self.policy_net.state_dict(), pretrain_full_path)
+    def layers_for_weight_diff(self):
+        layer_list = []
+        for i in range(2):
+            for layer in self.q_net_list[i].hidden_layers:
+                layer_list.append(layer)
+        return layer_list
+    def features_from_batch(self, batch):
+        obs_tensor = Tensor(batch['obs1']).to(self.device)
+        obs_next_tensor = Tensor(batch['obs2']).to(self.device)
+        acts_tensor = Tensor(batch['acts']).to(self.device)
+        rews_tensor = Tensor(batch['rews']).unsqueeze(1).to(self.device)
+        done_tensor = Tensor(batch['done']).unsqueeze(1).to(self.device)
+
+        features1 = self.q_net_list[0].get_feature(torch.cat([obs_next_tensor, acts_tensor], 1))
+        features2 = self.q_net_list[1].get_feature(torch.cat([obs_next_tensor, acts_tensor], 1))
+        return torch.cat([features1, features2], 1)
+
+    def load_pretrained_model(self, folder_path, pretrain_mode, pretrain_epochs):
+        pretrain_model_file_name = '%s_h%s_%s_e%s.pth' % (pretrain_mode, self.hidden_layer, self.hidden_unit, pretrain_epochs)
+        pretrain_full_path = os.path.join(folder_path, pretrain_model_file_name)
+        d = torch.load(pretrain_full_path)
+        self.q_net_list[0].load_state_dict(d['q1'])
+        self.q_net_list[1].load_state_dict(d['q2'])
+        self.q_target_net_list[0].load_state_dict(d['q1'])
+        self.q_target_net_list[1].load_state_dict(d['q2'])
+    def save_pretrained_model(self, folder_path, pretrain_mode, pretrain_epochs):
+        pretrain_model_file_name = '%s_h%s_%s_e%s.pth' % (pretrain_mode, self.hidden_layer, self.hidden_unit, pretrain_epochs)
+        pretrain_full_path = os.path.join(folder_path, pretrain_model_file_name)
+        d = {
+            'q1': self.q_net_list[0].state_dict(),
+            'q2': self.q_net_list[1].state_dict()
+        }
+        if not os.path.exists(pretrain_full_path):
+            torch.save(d, pretrain_full_path)
+            print("Saved pretrained model to:", pretrain_full_path)
+        else:
+            print("Pretrained model not saved. Already exist:", pretrain_full_path)

@@ -1,3 +1,4 @@
+import os.path
 import numpy as np
 import torch
 from torch import Tensor
@@ -12,7 +13,7 @@ class ILAgent(object):
     imitation learning baseline
     """
     def __init__(self, env_name, obs_dim, act_dim, act_limit, device,
-                 hidden_sizes=(256, 256), replay_size=int(1e6), batch_size=256,
+                 hidden_layer=2, hidden_unit=256, replay_size=int(1e6), batch_size=256,
                  lr=3e-4, gamma=0.99, polyak=0.995,
                  alpha=0.2, auto_alpha=True, target_entropy='mbpo',
                  start_steps=5000, delay_update_steps='auto',
@@ -22,6 +23,7 @@ class ILAgent(object):
                  safe_q_target_factor=0.5,
                  ):
         # set up networks
+        hidden_sizes = [hidden_unit for _ in range(hidden_layer)]
         self.policy_net = PolicyNetworkPretrain(obs_dim, act_dim, hidden_sizes, action_limit=act_limit).to(device)
         # set up optimizers
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
@@ -37,6 +39,8 @@ class ILAgent(object):
         self.act_limit = act_limit
         self.lr = lr
         self.hidden_sizes = hidden_sizes
+        self.hidden_layer = hidden_layer
+        self.hidden_unit = hidden_unit
         self.gamma = gamma
         self.polyak = polyak
         self.replay_size = replay_size
@@ -148,7 +152,15 @@ class ILAgent(object):
         rews_tensor = Tensor(batch['rews']).unsqueeze(1).to(self.device)
         done_tensor = Tensor(batch['done']).unsqueeze(1).to(self.device)
         return self.policy_net.get_feature(obs_tensor)
-    def load_pretrained_model(self, pretrain_mode, pretrain_full_path):
+    def load_pretrained_model(self, folder_path, pretrain_mode, pretrain_epochs):
+        pretrain_model_file_name = '%s_h%s_%s_e%s.pth' % (pretrain_mode, self.hidden_layer, self.hidden_unit, pretrain_epochs)
+        pretrain_full_path = os.path.join(folder_path, pretrain_model_file_name)
         self.policy_net.load_state_dict(torch.load(pretrain_full_path))
-    def save_pretrained_model(self, pretrain_mode, pretrain_full_path):
-        torch.save(self.policy_net.state_dict(), pretrain_full_path)
+    def save_pretrained_model(self, folder_path, pretrain_mode, pretrain_epochs):
+        pretrain_model_file_name = '%s_h%s_%s_e%s.pth' % (pretrain_mode, self.hidden_layer, self.hidden_unit, pretrain_epochs)
+        pretrain_full_path = os.path.join(folder_path, pretrain_model_file_name)
+        if not os.path.exists(pretrain_full_path):
+            torch.save(self.policy_net.state_dict(), pretrain_full_path)
+            print("Saved pretrained model to:", pretrain_full_path)
+        else:
+            print("Pretrained model not saved. Already exist:", pretrain_full_path)
