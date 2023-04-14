@@ -43,8 +43,8 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
                evaluate_bias=False, n_mc_eval=1000, n_mc_cutoff=350, reseed_each_epoch=True,
                # new experiments
                ensemble_decay_n_data=20000, safe_q_target_factor=0.5,
-               do_pretrain=True, pretrain_epochs=200, pretrain_mode='pi_sprime',
-               save_agent=True, offline_data_ratio=1,
+               do_pretrain=False, pretrain_epochs=200, pretrain_mode='pi_sprime',
+               save_agent=True, offline_data_ratio=1, agent_type='il',
                # pretrain_mode:
                # 1. pi_sprime
                # 2. pi_mc
@@ -151,13 +151,22 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
     print("Env: %s, number of data loaded: %d." % (env_name, dataset['actions'].shape[0]))
 
     """init agent and load data into buffer"""
-    agent = ILAgent(env_name, obs_dim, act_dim, act_limit, device,
-                     hidden_sizes, replay_size, batch_size,
-                     lr, gamma, polyak,
-                     alpha, auto_alpha, target_entropy,
-                     start_steps, delay_update_steps,
-                     utd_ratio, num_Q, num_min, q_target_mode,
-                     policy_update_delay, ensemble_decay_n_data, safe_q_target_factor)
+    if agent_type == 'il':
+        agent = ILAgent(env_name, obs_dim, act_dim, act_limit, device,
+                         hidden_sizes, replay_size, batch_size,
+                         lr, gamma, polyak,
+                         alpha, auto_alpha, target_entropy,
+                         start_steps, delay_update_steps,
+                         utd_ratio, num_Q, num_min, q_target_mode,
+                         policy_update_delay, ensemble_decay_n_data, safe_q_target_factor)
+    if agent_type == 'cql':
+        agent = CQLAgent(env_name, obs_dim, act_dim, act_limit, device,
+                         hidden_sizes, replay_size, batch_size,
+                         lr, gamma, polyak,
+                         alpha, auto_alpha, target_entropy,
+                         start_steps, delay_update_steps,
+                         utd_ratio, num_Q, num_min, q_target_mode,
+                         policy_update_delay, ensemble_decay_n_data, safe_q_target_factor)
 
     agent.load_data(dataset, offline_data_ratio, seed=999999)
 
@@ -171,6 +180,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
         pretrain_model_file_name = '%s_h%s_%s_e%s.pth' % (pretrain_mode, hidden_layer, hidden_unit, pretrain_epochs)
         pretrain_full_path = os.path.join('/code/pretrain', pretrain_model_file_name)
         if os.path.exists(pretrain_full_path):
+            print("Try loading pretrained model:",pretrain_full_path)
             agent.load_pretrained_model(pretrain_mode, pretrain_full_path)
             print("Pretrained model loaded from:", pretrain_full_path)
         else:
@@ -304,6 +314,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='cql')
     parser.add_argument('--data_dir', type=str, default='../data/')
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--pretrain', action='store_true')
     args = parser.parse_args()
 
     # modify the code here if you want to use a different naming scheme
@@ -314,4 +325,4 @@ if __name__ == '__main__':
     logger_kwargs = setup_logger_kwargs(exp_name_full, args.seed, args.data_dir)
 
     train_d4rl(args.env, seed=args.seed, epochs=args.epochs,
-               logger_kwargs=logger_kwargs, debug=args.debug)
+               logger_kwargs=logger_kwargs, debug=args.debug, do_pretrain=args.pretrain)
