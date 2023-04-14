@@ -3,8 +3,8 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 import torch.optim as optim
-from redq.algos.core import TanhGaussianPolicy, Mlp, soft_update_model1_with_model2, ReplayBuffer,\
-    get_d4rl_target_entropy
+import torch.nn.functional as F
+from redq.algos.core import Mlp, soft_update_model1_with_model2, ReplayBuffer, PolicyNetworkPretrain
 
 def get_probabilistic_num_min(num_mins):
     # allows the number of min to be a float
@@ -32,13 +32,14 @@ class CQLAgent(object):
                  lr=3e-4, gamma=0.99, polyak=0.995,
                  alpha=0.2, auto_alpha=True, target_entropy='mbpo',
                  start_steps=5000, delay_update_steps='auto',
-                 utd_ratio=20, num_Q=10, num_min=2, q_target_mode='min',
+                 utd_ratio=1, num_Q=2, num_min=2, q_target_mode='min',
                  policy_update_delay=20,
                  ensemble_decay_n_data=20000, # wait for how many data to reduce number of ensemble (e.g. 20,000 data)
                  safe_q_target_factor=0.5,
+                 cql_weight=1, cql_n_random=10, cql_temp=1, std=0.1,
                  ):
         # set up networks
-        self.policy_net = TanhGaussianPolicy(obs_dim, act_dim, hidden_sizes, action_limit=act_limit).to(device)
+        self.policy_net = PolicyNetworkPretrain(obs_dim, act_dim, hidden_sizes, action_limit=act_limit).to(device)
         self.q_net_list, self.q_target_net_list = [], []
         for q_i in range(num_Q):
             new_q_net = Mlp(obs_dim + act_dim, 1, hidden_sizes).to(device)
@@ -51,25 +52,16 @@ class CQLAgent(object):
         self.q_optimizer_list = []
         for q_i in range(num_Q):
             self.q_optimizer_list.append(optim.Adam(self.q_net_list[q_i].parameters(), lr=lr))
-        # set up adaptive entropy (SAC adaptive)
-        self.auto_alpha = auto_alpha
-        if auto_alpha:
-            if target_entropy == 'auto':
-                self.target_entropy = - act_dim
-            if target_entropy == 'mbpo':
-                self.target_entropy = get_d4rl_target_entropy(env_name)
-            self.log_alpha = torch.zeros(1, requires_grad=True, device=device)
-            self.alpha_optim = optim.Adam([self.log_alpha], lr=lr)
-            self.alpha = self.log_alpha.cpu().exp().item()
-        else:
-            self.alpha = alpha
-            self.target_entropy, self.log_alpha, self.alpha_optim = None, None, None
         # set up replay buffer
         self.replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
         # set up other things
         self.mse_criterion = nn.MSELoss()
 
         # store other hyperparameters
+        self.std = std
+        self.cql_weight = cql_weight
+        self.cql_n_random = cql_n_random
+        self.cql_temp = cql_temp
         self.start_steps = start_steps
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -79,7 +71,6 @@ class CQLAgent(object):
         self.gamma = gamma
         self.polyak = polyak
         self.replay_size = replay_size
-        self.alpha = alpha
         self.batch_size = batch_size
         self.num_min = num_min
         self.num_Q = num_Q
@@ -141,23 +132,28 @@ class CQLAgent(object):
 
     def store_data(self, o, a, r, o2, d):
         # store one transition to the buffer
-        self.update_safe_q(r)
         self.replay_buffer.store(o, a, r, o2, d)
 
-    def load_data(self, dataset): # load a d4rl q learning dataset
+    def load_data(self, dataset, data_ratio, seed): # load a d4rl q learning dataset
+        # e.g. if ratio is 0.4, we use 40% of the data (depends on how many we have in the dataset)
         assert self.replay_buffer.size == 0
         n_data = dataset['actions'].shape[0]
         n_data = min(n_data, self.replay_buffer.max_size)
-        self.replay_buffer.obs1_buf[0:n_data] = dataset['observations']
-        self.replay_buffer.obs2_buf[0:n_data] = dataset['next_observations']
-        self.replay_buffer.acts_buf[0:n_data] = dataset['actions']
-        self.replay_buffer.rews_buf[0:n_data] = dataset['rewards']
-        self.replay_buffer.done_buf[0:n_data] = dataset['terminals']
-        self.replay_buffer.ptr, self.replay_buffer.size = n_data, n_data
 
-    def sample_data(self, batch_size):
+        n_data_to_use = int(n_data * data_ratio)
+        np.random.seed(seed)
+        idxs = np.random.choice(n_data, n_data_to_use, replace=False)
+
+        self.replay_buffer.obs1_buf[0:n_data_to_use] = dataset['observations'][idxs]
+        self.replay_buffer.obs2_buf[0:n_data_to_use] = dataset['next_observations'][idxs]
+        self.replay_buffer.acts_buf[0:n_data_to_use] = dataset['actions'][idxs]
+        self.replay_buffer.rews_buf[0:n_data_to_use] = dataset['rewards'][idxs]
+        self.replay_buffer.done_buf[0:n_data_to_use] = dataset['terminals'][idxs]
+        self.replay_buffer.ptr, self.replay_buffer.size = n_data_to_use, n_data_to_use
+
+    def sample_data(self, batch_size, idxs=None):
         # sample data from replay buffer
-        batch = self.replay_buffer.sample_batch(batch_size)
+        batch = self.replay_buffer.sample_batch(batch_size, idxs)
         obs_tensor = Tensor(batch['obs1']).to(self.device)
         obs_next_tensor = Tensor(batch['obs2']).to(self.device)
         acts_tensor = Tensor(batch['acts']).to(self.device)
@@ -165,121 +161,102 @@ class CQLAgent(object):
         done_tensor = Tensor(batch['done']).unsqueeze(1).to(self.device)
         return obs_tensor, obs_next_tensor, acts_tensor, rews_tensor, done_tensor
 
-    def get_redq_q_target_no_grad(self, obs_next_tensor, rews_tensor, done_tensor):
-        # compute REDQ Q target, depending on the agent's Q target mode
-        # allow min as a float:
-        num_mins_to_use = get_probabilistic_num_min(self.num_min)
-        sample_idxs = np.random.choice(self.num_Q, num_mins_to_use, replace=False)
+    def get_cql_q_target_no_grad(self, obs_next_tensor, rews_tensor, done_tensor):
         with torch.no_grad():
-            if self.q_target_mode == 'min':
-                """Q target is min of a subset of Q values"""
-                a_tilda_next, _, _, log_prob_a_tilda_next, _, _ = self.policy_net.forward(obs_next_tensor)
-                q_prediction_next_list = []
-                for sample_idx in sample_idxs:
-                    q_prediction_next = self.q_target_net_list[sample_idx](torch.cat([obs_next_tensor, a_tilda_next], 1))
-                    q_prediction_next_list.append(q_prediction_next)
-                q_prediction_next_cat = torch.cat(q_prediction_next_list, 1)
-                min_q, min_indices = torch.min(q_prediction_next_cat, dim=1, keepdim=True)
-                if self.safe_q_target_factor < 1: # TODO currently only for min mode
-                    min_q[min_q > (self.safe_q_threshold + 1)] = self.safe_q_threshold + (min_q[min_q > (
-                                self.safe_q_threshold + 1)] - self.safe_q_threshold) ** self.safe_q_target_factor
-                next_q_with_log_prob = min_q - self.alpha * log_prob_a_tilda_next
-                y_q = rews_tensor + self.gamma * (1 - done_tensor) * next_q_with_log_prob
-            if self.q_target_mode == 'ave':
-                """Q target is average of all Q values"""
-                a_tilda_next, _, _, log_prob_a_tilda_next, _, _ = self.policy_net.forward(obs_next_tensor)
-                q_prediction_next_list = []
-                for q_i in range(self.num_Q):
-                    q_prediction_next = self.q_target_net_list[q_i](torch.cat([obs_next_tensor, a_tilda_next], 1))
-                    q_prediction_next_list.append(q_prediction_next)
-                q_prediction_next_ave = torch.cat(q_prediction_next_list, 1).mean(dim=1).reshape(-1, 1)
-                next_q_with_log_prob = q_prediction_next_ave - self.alpha * log_prob_a_tilda_next
-                y_q = rews_tensor + self.gamma * (1 - done_tensor) * next_q_with_log_prob
-            if self.q_target_mode == 'rem':
-                """Q target is random ensemble mixture of Q values"""
-                a_tilda_next, _, _, log_prob_a_tilda_next, _, _ = self.policy_net.forward(obs_next_tensor)
-                q_prediction_next_list = []
-                for q_i in range(self.num_Q):
-                    q_prediction_next = self.q_target_net_list[q_i](torch.cat([obs_next_tensor, a_tilda_next], 1))
-                    q_prediction_next_list.append(q_prediction_next)
-                # apply rem here
-                q_prediction_next_cat = torch.cat(q_prediction_next_list, 1)
-                rem_weight = Tensor(np.random.uniform(0, 1, q_prediction_next_cat.shape)).to(device=self.device)
-                normalize_sum = rem_weight.sum(1).reshape(-1, 1).expand(-1, self.num_Q)
-                rem_weight = rem_weight / normalize_sum
-                q_prediction_next_rem = (q_prediction_next_cat * rem_weight).sum(dim=1).reshape(-1, 1)
-                next_q_with_log_prob = q_prediction_next_rem - self.alpha * log_prob_a_tilda_next
-                y_q = rews_tensor + self.gamma * (1 - done_tensor) * next_q_with_log_prob
-        return y_q, sample_idxs
+            a_tilda_next, _, _, log_prob_a_tilda_next, _, _ = self.policy_net.forward(obs_next_tensor, std=self.std)
+            q_prediction_next_list = []
+            for sample_idx in range(2):
+                q_prediction_next = self.q_target_net_list[sample_idx](torch.cat([obs_next_tensor, a_tilda_next], 1))
+                q_prediction_next_list.append(q_prediction_next)
+            q_prediction_next_cat = torch.cat(q_prediction_next_list, 1)
+            min_q, min_indices = torch.min(q_prediction_next_cat, dim=1, keepdim=True)
+            y_q = rews_tensor + self.gamma * (1 - done_tensor) * min_q
+        return y_q
 
-    def update_n_ensemble(self, i_update, ensemble_decay_n_data):
-        if ensemble_decay_n_data > 0:
-            n_removed_ensemble = int(i_update / ensemble_decay_n_data)
-            self.num_Q = max(self.init_num_Q - n_removed_ensemble, 2)
+    def get_q1_q2(self, obs, act):
+        q1 = self.q_net_list[0](torch.cat([obs, act], 1))
+        q2 = self.q_net_list[1](torch.cat([obs, act], 1))
+        return q1, q2
+    def get_q1_q2_target(self, obs, act):
+        q1 = self.q_target_net_list[0](torch.cat([obs, act], 1))
+        q2 = self.q_target_net_list[1](torch.cat([obs, act], 1))
+        return q1, q2
+    def get_act(self, obs):
+        a_tilda, mean_a_tilda, log_std_a_tilda, log_prob_a_tilda, _, pretanh = self.policy_net.forward(obs)
+        return a_tilda
 
-    def update_safe_q(self, reward):
-        if self.safe_q_target_factor < 1:
-            self.max_reward_per_step = max(self.max_reward_per_step, reward)
-            # set threshold to be 2x current max value to have some flexibility
-            self.safe_q_threshold = self.max_reward_per_step / (1-self.gamma) * 2
-
-    def train(self, logger):
+    def update(self, logger):
+        # cql offline update
         # this function is called after each datapoint collected.
         # when we only have very limited data, we don't make updates
-        num_update = 0 if self.__get_current_num_data() <= self.delay_update_steps else self.utd_ratio
+        num_update = 1
         for i_update in range(num_update):
-            """adaptive ensemble"""
-            self.update_n_ensemble(i_update, self.ensemble_decay_n_data)
-
             obs_tensor, obs_next_tensor, acts_tensor, rews_tensor, done_tensor = self.sample_data(self.batch_size)
 
-            """Q loss"""
-            y_q, sample_idxs = self.get_redq_q_target_no_grad(obs_next_tensor, rews_tensor, done_tensor)
-            q_prediction_list = []
-            for q_i in range(self.num_Q):
-                q_prediction = self.q_net_list[q_i](torch.cat([obs_tensor, acts_tensor], 1))
-                q_prediction_list.append(q_prediction)
+            """standard Q loss"""
+            # q target value
+            y_q = self.get_cql_q_target_no_grad(obs_next_tensor, rews_tensor, done_tensor)
+            # q pred
+            Q1, Q2 = self.get_q1_q2(obs_tensor, acts_tensor)
+            q_prediction_list = [Q1, Q2]
             q_prediction_cat = torch.cat(q_prediction_list, dim=1)
             y_q = y_q.expand((-1, self.num_Q)) if y_q.shape[1] == 1 else y_q
-            q_loss_all = self.mse_criterion(q_prediction_cat, y_q) * self.num_Q
+            critic_loss = self.mse_criterion(q_prediction_cat, y_q) * self.num_Q
 
+            """conservative q loss"""
+            if self.cql_weight > 0:
+                random_actions = (torch.rand((self.batch_size * self.cql_n_random, self.act_dim),
+                                             device=self.device) - 0.5) * 2
+
+                current_actions = self.get_act(obs_tensor)
+                next_current_actions = self.get_act(obs_next_tensor)
+
+                # now get Q values for all these actions (for both Q networks)
+                obs_repeat = obs_tensor.unsqueeze(1).repeat(1, self.cql_n_random, 1).view(obs_tensor.shape[0] * self.cql_n_random,
+                                                                                   obs_tensor.shape[1])
+
+                Q1_rand, Q2_rand = self.get_q1_q2(obs_repeat, random_actions)
+                Q1_rand = Q1_rand.view(obs_tensor.shape[0], self.cql_n_random)
+                Q2_rand = Q2_rand.view(obs_tensor.shape[0], self.cql_n_random)
+
+                Q1_curr, Q2_curr = self.get_q1_q2(obs_tensor, current_actions)
+                Q1_curr_next, Q2_curr_next = self.get_q1_q2(obs_tensor, next_current_actions)
+
+                # now concat all these Q values together
+                Q1_cat = torch.cat([Q1_rand, Q1, Q1_curr, Q1_curr_next], 1)
+                Q2_cat = torch.cat([Q2_rand, Q2, Q2_curr, Q2_curr_next], 1)
+
+                cql_min_q1_loss = torch.logsumexp(Q1_cat / self.cql_temp,
+                                                  dim=1, ).mean() * self.cql_weight * self.cql_temp
+                cql_min_q2_loss = torch.logsumexp(Q2_cat / self.cql_temp,
+                                                  dim=1, ).mean() * self.cql_weight * self.cql_temp
+
+                """Subtract the log likelihood of data"""
+                conservative_q_loss = cql_min_q1_loss + cql_min_q2_loss - (
+                            Q1.mean() + Q2.mean()) * self.cql_weight
+            else:
+                conservative_q_loss = 0
+            q_loss_all = critic_loss + conservative_q_loss
+
+            """q network update"""
             for q_i in range(self.num_Q):
                 self.q_optimizer_list[q_i].zero_grad()
             q_loss_all.backward()
-
-            """policy and alpha loss"""
-            if ((i_update + 1) % self.policy_update_delay == 0) or i_update == num_update - 1:
-                # get policy loss
-                a_tilda, mean_a_tilda, log_std_a_tilda, log_prob_a_tilda, _, pretanh = self.policy_net.forward(obs_tensor)
-                q_a_tilda_list = []
-                for sample_idx in range(self.num_Q):
-                    self.q_net_list[sample_idx].requires_grad_(False)
-                    q_a_tilda = self.q_net_list[sample_idx](torch.cat([obs_tensor, a_tilda], 1))
-                    q_a_tilda_list.append(q_a_tilda)
-                q_a_tilda_cat = torch.cat(q_a_tilda_list, 1)
-                ave_q = torch.mean(q_a_tilda_cat, dim=1, keepdim=True)
-                policy_loss = (self.alpha * log_prob_a_tilda - ave_q).mean()
-                self.policy_optimizer.zero_grad()
-                policy_loss.backward()
-                for sample_idx in range(self.num_Q):
-                    self.q_net_list[sample_idx].requires_grad_(True)
-
-                # get alpha loss
-                if self.auto_alpha:
-                    alpha_loss = -(self.log_alpha * (log_prob_a_tilda + self.target_entropy).detach()).mean()
-                    self.alpha_optim.zero_grad()
-                    alpha_loss.backward()
-                    self.alpha_optim.step()
-                    self.alpha = self.log_alpha.cpu().exp().item()
-                else:
-                    alpha_loss = Tensor([0])
-
-            """update networks"""
             for q_i in range(self.num_Q):
                 self.q_optimizer_list[q_i].step()
 
-            if ((i_update + 1) % self.policy_update_delay == 0) or i_update == num_update - 1:
-                self.policy_optimizer.step()
+            """policy loss"""
+            # get policy loss
+            current_action, mean_a_tilda, _, log_prob_a_tilda, _, pretanh = self.policy_net.forward(obs_tensor, std=self.std)
+            Q1, Q2 = self.get_q1_q2(obs_tensor, acts_tensor)
+            Q = torch.min(Q1, Q2)
+            policy_loss = -Q.mean()
+
+            """policy update"""
+            self.policy_optimizer.zero_grad()
+            policy_loss.backward()
+            for sample_idx in range(self.num_Q):
+                self.q_net_list[sample_idx].requires_grad_(True)
 
             # polyak averaged Q target networks
             for q_i in range(self.num_Q):
@@ -287,12 +264,36 @@ class CQLAgent(object):
 
             # by default only log for the last update out of <num_update> updates
             if i_update == num_update - 1:
-                logger.store(LossPi=policy_loss.cpu().item(), LossQ1=q_loss_all.cpu().item() / self.num_Q,
-                             LossAlpha=alpha_loss.cpu().item(), Q1Vals=q_prediction.detach().cpu().numpy(),
-                             Alpha=self.alpha, LogPi=log_prob_a_tilda.detach().cpu().numpy(),
+                with torch.no_grad():
+                    logger.store(LossPi=policy_loss.item(), LossQ=q_loss_all.item() / self.num_Q,
+                             Q1Vals=Q1.mean().item(), LogPi=log_prob_a_tilda.mean().item(),
                              PreTanh=pretanh.abs().detach().cpu().numpy().reshape(-1))
 
-        # if there is no update, log 0 to prevent logging problems
-        if num_update == 0:
-            logger.store(LossPi=0, LossQ1=0, LossAlpha=0, Q1Vals=0, Alpha=0, LogPi=0, PreTanh=0)
+    def pretrain_update(self, logger, pretrain_mode): # TODO fix
+        # pretrain mode example: q_sprime
+        # predict next obs with current obs
+        for i_update in range(1):
+            obs_tensor, obs_next_tensor, acts_tensor, rews_tensor, done_tensor = self.sample_data(self.batch_size)
 
+            if pretrain_mode == 'pi_sprime':
+                """mse loss for predicting next obs"""
+                obs_next_pred = self.policy_net.predict_next_obs(obs_tensor)
+                pretrain_loss = F.mse_loss(obs_next_pred, obs_next_tensor)
+                self.policy_optimizer.zero_grad()
+                pretrain_loss.backward()
+
+                """update networks"""
+                self.policy_optimizer.step()
+
+                # by default only log for the last update out of <num_update> updates
+                logger.store(LossPretrain=pretrain_loss.cpu().item())
+            else:
+                raise NotImplementedError("Pretrain mode not implemented: %s" % pretrain_mode)
+
+    def get_weight_and_feature_diff(self, other_agent):  #TODO change from IL
+        return weight_diff, np.mean(average_feature_l2_norm_list)
+
+    def load_pretrained_model(self, pretrain_mode, pretrain_full_path):  #TODO change from IL
+        self.policy_net.load_state_dict(torch.load(pretrain_full_path))
+    def save_pretrained_model(self, pretrain_mode, pretrain_full_path):  #TODO change from IL
+        torch.save(self.policy_net.state_dict(), pretrain_full_path)

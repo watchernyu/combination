@@ -176,6 +176,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
     seed_all(epoch=0)
     pretrain_stage_start_time = time.time()
     if do_pretrain and pretrain_mode is not None:
+        print("Pretraining start, mode:",pretrain_mode)
         # check if pretrain
         pretrain_model_file_name = '%s_h%s_%s_e%s.pth' % (pretrain_mode, hidden_layer, hidden_unit, pretrain_epochs)
         pretrain_full_path = os.path.join('/code/pretrain', pretrain_model_file_name)
@@ -221,6 +222,7 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
     seed_all(100000)
     # keep track of run time
     offline_stage_start_time = time.time()
+    print("Offline stage start!")
     for t in range(n_offline_updates):
         agent.update(logger)
 
@@ -303,7 +305,6 @@ def train_d4rl(env_name='hopper-expert-v2', seed=0, epochs=200, steps_per_epoch=
         'best_return_normalized':best_return_normalized,
     }
     logger.save_extra_dict_as_json(extra_dict, 'extra.json')
-    # and then save this somewhere...
 
 if __name__ == '__main__':
     import argparse
