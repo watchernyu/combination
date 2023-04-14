@@ -90,24 +90,12 @@ class CQLAgent(object):
         # used to determine whether we should get action from policy or take random starting actions
         return self.replay_buffer.size
 
-    def get_exploration_action(self, obs, env):
-        # given an observation, output a sampled action in numpy form
-        with torch.no_grad():
-            if self.__get_current_num_data() > self.start_steps:
-                obs_tensor = torch.Tensor(obs).unsqueeze(0).to(self.device)
-                action_tensor = self.policy_net.forward(obs_tensor, deterministic=False,
-                                             return_log_prob=False)[0]
-                action = action_tensor.cpu().numpy().reshape(-1)
-            else:
-                action = env.action_space.sample()
-        return action
-
     def get_test_action(self, obs):
         # given an observation, output a deterministic action in numpy form
         with torch.no_grad():
             obs_tensor = torch.Tensor(obs).unsqueeze(0).to(self.device)
-            action_tensor = self.policy_net.forward(obs_tensor, deterministic=True,
-                                         return_log_prob=False)[0]
+            action_tensor = self.policy_net.forward(obs_tensor, std=self.std,
+                                                    deterministic=True, return_log_prob=False)[0]
             action = action_tensor.cpu().numpy().reshape(-1)
         return action
 
@@ -115,8 +103,8 @@ class CQLAgent(object):
         # given an observation, output a sampled action in numpy form
         with torch.no_grad():
             obs_tensor = torch.Tensor(obs).unsqueeze(0).to(self.device)
-            action_tensor, _, _, log_prob_a_tilda, _, _, = self.policy_net.forward(obs_tensor, deterministic=False,
-                                         return_log_prob=True)
+            action_tensor, _, _, log_prob_a_tilda, _, _, = self.policy_net.forward(obs_tensor, std=self.std,
+                                                                                   deterministic=False, return_log_prob=True)
             action = action_tensor.cpu().numpy().reshape(-1)
         return action, log_prob_a_tilda
 
