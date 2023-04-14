@@ -201,6 +201,7 @@ class CQLAgent(object):
             q_prediction_list = [Q1, Q2]
             q_prediction_cat = torch.cat(q_prediction_list, dim=1)
             y_q = y_q.expand((-1, self.num_Q)) if y_q.shape[1] == 1 else y_q
+            print(q_prediction_cat.shape, y_q.shape)
             critic_loss = self.mse_criterion(q_prediction_cat, y_q) * self.num_Q
 
             """conservative q loss"""
