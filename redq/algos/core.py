@@ -352,7 +352,8 @@ class PolicyNetworkPretrain(nn.Module):
         """
         h = self.get_feature(obs)
         mean = self.last_fc_layer(h)
-        normal = Normal(mean, std)
+
+        normal = Normal(mean, torch.ones_like(mean)*std)
 
         if deterministic:
             pre_tanh_value = mean
