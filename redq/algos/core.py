@@ -482,15 +482,23 @@ def get_weight_diff(agent1, agent2):
     weight_diff = torch.norm(weights1-weights2, p=2).item()
     return weight_diff
 
-def get_feature_diff(agent1, agent2, replay_buffer):
+def get_feature_diff(agent1, agent2, replay_buffer, ratio=0.1, seed=0):
     # feature diff: for each data point, get difference of feature from old and new network
     # compute l2 norm of this diff, average over a number of data points.
     # agent class should have features_from_batch() func
     average_feature_l2_norm_list = []
-    idxs_all = np.random.choice(np.arange(0, replay_buffer.size), size=100000, replace=False)
+    num_feature_timesteps = int(replay_buffer.size * ratio)
+    if num_feature_timesteps % 2 == 1: # avoid potential sampling issue
+        num_feature_timesteps = num_feature_timesteps + 1
+    np.random.seed(seed)
+    idxs_all = np.random.choice(np.arange(0, replay_buffer.size), size=num_feature_timesteps, replace=False)
     batch_size = 1000
-    for i in range(100):
-        idxs = idxs_all[i*1000:(i+1)*1000]
+    n_done = 0
+    i = 0
+    while True:
+        if n_done >= num_feature_timesteps:
+            break
+        idxs = idxs_all[i*1000:min((i+1)*1000, num_feature_timesteps)]
 
         batch = replay_buffer.sample_batch(batch_size, idxs)
         old_feature = agent1.features_from_batch(batch)
@@ -499,5 +507,8 @@ def get_feature_diff(agent1, agent2, replay_buffer):
 
         feature_l2_norm = torch.norm(feature_diff, p=2, dim=1, keepdim=True)
         average_feature_l2_norm_list.append(feature_l2_norm.mean().item())
-    return np.mean(average_feature_l2_norm_list)
+        i += 1
+        n_done += 1000
+
+    return np.mean(average_feature_l2_norm_list), num_feature_timesteps
 
